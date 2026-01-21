@@ -24,35 +24,51 @@ from ai_ui import render_ai_intelligence_tab
 
 # --- 2. SECURITY GATE (STREAMLIT SECRETS) ---
 def check_password():
-    """Mengecek akses menggunakan kunci di .streamlit/secrets.toml"""
+    """Mengecek akses menggunakan kunci di .streamlit/secrets.toml dengan proteksi KeyError."""
+
+    # 1. Inisialisasi status awal jika belum ada di memori
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+
+    # 2. Jika sudah pernah login sukses, langsung kembalikan True
+    if st.session_state["password_correct"]:
+        return True
 
     def password_entered():
-        # Membandingkan input dengan terminal_password di secrets.toml
-        if st.session_state["password"] == st.secrets["terminal_password"]:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-        else:
-            st.session_state["password_correct"] = False
+        """Callback saat user menekan Enter di kotak password."""
+        # Pastikan key 'password' ada di session_state sebelum dibaca
+        if "password" in st.session_state:
+            if st.session_state["password"] == st.secrets["terminal_password"]:
+                st.session_state["password_correct"] = True
+                # Hapus password dari memori setelah sukses (keamanan)
+                del st.session_state["password"]
+            else:
+                st.session_state["password_correct"] = False
 
-    if "password_correct" not in st.session_state:
-        # Layout Halaman Login
-        st.markdown("""
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Public+Sans&display=swap');
-                .login-container { text-align: center; margin-top: 15%; font-family: 'Public Sans', sans-serif; }
-                .terminal-header { font-family: 'Orbitron', sans-serif; color: #00ffcc; letter-spacing: 5px; font-size: 24px; margin-bottom: 30px; }
-            </style>
-            <div class="login-container">
-                <p class="terminal-header">⚛️ hAI terminal ACCESS</p>
-            </div>
-        """, unsafe_allow_html=True)
+    # 3. Tampilan Login Page
+    st.markdown("""
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Public+Sans&display=swap');
+            .login-container { text-align: center; margin-top: 15%; font-family: 'Public Sans', sans-serif; }
+            .terminal-header { font-family: 'Orbitron', sans-serif; color: #00ffcc; letter-spacing: 5px; font-size: 24px; margin-bottom: 30px; }
+        </style>
+        <div class="login-container">
+            <p class="terminal-header">⚛️ hAI terminal ACCESS</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-        col_l, col_m, col_r = st.columns([1, 1, 1])
-        with col_m:
-            st.text_input("ENTER ACCESS KEY", type="password", on_change=password_entered, key="password")
-            if "password_correct" in st.session_state and not st.session_state["password_correct"]:
+    col_l, col_m, col_r = st.columns([1, 1, 1])
+    with col_m:
+        # Widget ini yang menciptakan key "password" di session_state
+        st.text_input("ENTER ACCESS KEY", type="password", on_change=password_entered, key="password")
+
+        # Tampilkan pesan error jika salah
+        if "password_correct" in st.session_state and st.session_state["password_correct"] == False:
+            if "password" not in st.session_state:  # Cek jika sudah di-submit tapi salah
                 st.error("⚠️ ACCESS DENIED: INVALID KEY")
-        return False
+
+    return False
+
     return st.session_state["password_correct"]
 
 
@@ -103,14 +119,27 @@ if check_password():
         if refresh_on:
             st_autorefresh(interval=10000, key="global_refresh")
 
+            # --- TELEGRAM TEST TRIGGER ---
+        st.divider()
+        if st.button("🚀 TEST NOTIF KE IPHONE"):
+            from data_provider import send_telegram_alert
+
+            test_msg = f"⚛️ *hAI Terminal: Connection Sync*\nStatus: Connected\nTime: {datetime.now(tz_jkt).strftime('%H:%M:%S')}\n\n*Ready for Trading, Bang!*"
+            send_telegram_alert(test_msg)
+            st.toast("Notifikasi dikirim!", icon="📲")
+
     # --- 5. DATA ENGINE PROCESSING ---
     try:
         macro = fetch_macro_data()
         df_raw = fetch_forex_data(ticker, "60d", tf)
         df_active = hitung_indikator_lengkap(df_raw)
 
-        # Header Logic
+        # Hitung variabel ini di sini (Global), jangan di dalam Tab!
+        news_alerts = check_news_shield(ticker)
+        fib_levels = calculate_fibonacci_levels(df_active)
         last_close = df_active['Close'].iloc[-1]
+
+        # Header Logic
         prev_close = df_active['Close'].iloc[-2]
         price_delta = last_close - prev_close
         pct_delta = (price_delta / prev_close) * 100
@@ -120,8 +149,15 @@ if check_password():
         si, sd, _ = get_market_sentiment(ticker)
         score_res = get_detailed_scores_v10(df_active, macro, si, 0)
 
+        # Proses Analisa AI Strategis (Jadikan Global untuk Notifikasi)
+        analysis = generate_strategic_verdict(ticker, score_res, fib_levels, last_close, news_alerts)
+
         # Market Session Logic
         sessions, _, m_note, m_color = get_market_sessions()
+
+        # --- 6. BACKGROUND ENGINE (NOTIFIKASI & HEARTBEAT) ---
+        tz_jkt = pytz.timezone('Asia/Jakarta')
+        now_jkt = datetime.now(tz_jkt)
 
         # --- 6. GLOBAL TELEMETRY HEADER (STAY ON TOP) ---
         h1, h2, h3 = st.columns([2, 1, 1])
@@ -163,6 +199,31 @@ if check_password():
 
         st.markdown("<br>", unsafe_allow_html=True)
 
+        # --- HEARTBEAT 22:00 WIB ---
+        tz_jkt = pytz.timezone('Asia/Jakarta')
+        now_jkt = datetime.now(tz_jkt)
+
+        if now_jkt.hour == 22 and now_jkt.minute == 0:
+            heartbeat_key = f"hb_{now_jkt.strftime('%Y%m%d')}"
+            if heartbeat_key not in st.session_state:
+                from data_provider import send_telegram_alert
+
+                send_telegram_alert("📡 *SYSTEM CHECK*: Masih cari yang OK nih...")
+                st.session_state[heartbeat_key] = True
+
+        # --- DYNAMIC SIGNAL TRIGGER (+/- 6 + Astro) ---
+        # Trigger otomatis jika skor minimal +/- 6 DAN harga di area Golden
+        if abs(analysis['q_val']) >= 6 and analysis['is_near']:
+            notif_key = f"signal_{ticker}_{df_active.index[-1]}"
+            if notif_key not in st.session_state:
+                from data_provider import send_telegram_alert
+
+                pesan = f"⚛️ *{ticker.replace('=X', '')}* | `{last_close:,.5f}`\n" \
+                        f"Verdict: *{analysis['verdict']}*\n" \
+                        f"Action: {analysis['action']}"
+                send_telegram_alert(pesan)
+                st.session_state[notif_key] = True
+
         # --- 7. THE INTERFACE TABS ---
         tab_q, tab_a, tab_ai = st.tabs(["⚛️ QUANTUM DATA", "🔭 ASTRONACCI", "🧠 AI HUB"])
 
@@ -175,15 +236,7 @@ if check_password():
             render_astronacci_tab(ticker, df_active)
 
         with tab_ai:
-            # Proses Analisa AI Strategis
-            news_alerts = check_news_shield(ticker)
-            fib_levels = calculate_fibonacci_levels(df_active)
-
-            # Generate Verdict dari ai_analyst.py
-            analysis = generate_strategic_verdict(ticker, score_res, fib_levels, last_close, news_alerts)
-
-            # Tampilkan di UI ai_ui.py
-            render_ai_intelligence_tab(ticker, analysis)
+           render_ai_intelligence_tab(ticker, analysis)
 
     except Exception as e:
         st.error(f"🛑 TERMINAL CORE ERROR: {e}")

@@ -1,10 +1,29 @@
 import pandas as pd
 import yfinance as yf
 import streamlit as st
+import requests
 from datetime import datetime
 from gnews import GNews
 from textblob import TextBlob
 
+
+def send_telegram_alert(message):
+    """Mengirim pesan ke Telegram menggunakan Bot API."""
+    token = st.secrets["telegram_token"]
+    chat_id = st.secrets["telegram_chat_id"]
+
+    # Format URL untuk Telegram API
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+
+    try:
+        requests.post(url, data=payload)
+    except Exception as e:
+        print(f"Gagal kirim Telegram: {e}")
 
 # --- 1. ASSET LIST (YAHOO STYLE) ---
 def get_forex_list():

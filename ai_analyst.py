@@ -1,64 +1,58 @@
 import pandas as pd
 
+
 def generate_strategic_verdict(ticker, score_res, fib_data, p_now, news_alerts):
     """
-    Intelligence Logic: Sinkronisasi treshold Quantum +/- 10 dan Astro Area.
+    Intelligence Logic: Sensitive threshold +/- 6.
+    Fix: UnboundLocalError by initializing variables at the start.
     """
+    # 1. INITIALIZATION (Biar nggak error lagi)
     q_score = score_res.get('total', 0)
     golden_ratio = fib_data.get('61.8% (Golden)', 0)
 
-    # 1. PENETUAN THRESHOLD (Sesuai aktual: Max +/- 10)
-    is_strong_bias = abs(q_score) >= 8
-    is_moderate_bias = abs(q_score) >= 5
+    verdict = "NEUTRAL / MONITORING"
+    color = "#888888"
+    action = "Wait for Bias"
+    news_brief = "News Shield: Stable. No Red Flags."  # Definisikan di awal
 
-    # Jarak toleransi Golden Ratio (0.1% untuk akurasi tinggi)
+    # Jarak toleransi Golden Ratio (0.1%)
     proximity_threshold = 0.001
     is_near_golden = abs(p_now - golden_ratio) / golden_ratio < proximity_threshold
 
-    # 2. DECISION MATRIX
-    verdict = "NEUTRAL / MONITORING"
-    color = "#888888"
-    action = "Wait for High Conviction Score"
-
-    # Kondisi POSITIVE (Score harus tinggi + Harga di atas Golden)
-    if q_score >= 7 and p_now > golden_ratio:
-        verdict = "POSITIVE / BULLISH BIAS"
-        color = "#00ffcc"
-        if q_score >= 10 and is_near_golden:
+    # 2. DECISION MATRIX (THRESHOLD +/- 6)
+    if q_score >= 6:
+        # Range 6 - 8: Sedikit Positif
+        if q_score <= 8:
+            verdict = "SEDIKIT POSITIF"
+            color = "#a3ffeb"  # Hijau soft
+        # Range > 8: Extreme
+        else:
             verdict = "EXTREME POSITIVE / CONFIRMED"
-            action = "Ready to Execute: HIGH CONVICTION BUY"
-        else:
-            action = "Build Position: Watch for Golden Ratio Rebound"
+            color = "#00ffcc"  # Hijau neon
 
-    # Kondisi NEGATIVE (Score harus rendah + Harga di bawah Golden)
-    elif q_score <= -7 and p_now < golden_ratio:
-        verdict = "NEGATIVE / BEARISH BIAS"
-        color = "#ff4b4b"
-        if q_score <= -10 and is_near_golden:
+        action = "READY TO BUY" if is_near_golden else "Wait for Golden Area"
+
+    elif q_score <= -6:
+        # Range -6 s/d -8: Sedikit Negatif
+        if q_score >= -8:
+            verdict = "SEDIKIT NEGATIF"
+            color = "#ff8585"  # Merah soft
+        # Range < -8: Extreme
+        else:
             verdict = "EXTREME NEGATIVE / CONFIRMED"
-            action = "Ready to Execute: HIGH CONVICTION SELL"
-        else:
-            action = "Build Position: Watch for Golden Ratio Rejection"
+            color = "#ff4b4b"  # Merah neon
 
-    # 3. NEWS SHIELD IMPACT
-    news_brief = "News Shield: Stable. No High-Impact Threats."
+        action = "READY TO SELL" if is_near_golden else "Wait for Golden Area"
+
+    # 3. NEWS IMPACT OVERRIDE
     if news_alerts:
-        news_brief = f"⚠️ WARNING: {len(news_alerts)} High-Impact news active. Reduce Lot Size."
-        if is_strong_bias:
-            verdict = "CAUTIOUS " + verdict.split('/')[1]
-
-    # 4. SUMMARY GENERATION
-    summary = f"Instrument {ticker.replace('=X', '')} holding Quantum Score: {q_score:+}."
-    if is_near_golden:
-        summary += " Price action currently testing Astro Golden Ratio (61.8%)."
-    else:
-        summary += " Price is floating between levels. Institutional interest is low at current price."
+        news_brief = f"⚠️ WARNING: {len(news_alerts)} High-Impact news active."
 
     return {
         "verdict": verdict,
         "color": color,
         "action": action,
-        "summary": summary,
+        "summary": f"Bias {verdict} detect with score {q_score:+}.",
         "news_brief": news_brief,
         "q_val": q_score,
         "is_near": is_near_golden
