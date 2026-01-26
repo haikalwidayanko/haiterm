@@ -180,14 +180,17 @@ def calculate_fibonacci_levels(df):
     if diff == 0:
         diff = 1e-9
 
+    # Di dalam engine.py
     return {
         '0% (Low)': lowest_low,
         '23.6%': highest_high - (diff * 0.236),
         '38.2%': highest_high - (diff * 0.382),
         '50.0%': highest_high - (diff * 0.5),
         '61.8% (Golden)': highest_high - (diff * 0.618),
-        '78.6%': highest_high - (diff * 0.786),
-        '100% (High)': highest_high
+        '78.6% (Deep)': highest_high - (diff * 0.786),
+        '100% (High)': highest_high,
+        '127.2% (T1)': highest_high + (diff * 0.272),  # Extension
+        '161.8% (T2)': highest_high + (diff * 0.618)  # Extension
     }
 
 
