@@ -44,34 +44,28 @@ def get_forex_list():
 # --- 2. MACRO DATA ENGINE ---
 
 def fetch_macro_data():
-    """Mengambil data DXY dan Yields 10-Tahun untuk Quantum Score."""
+    """Mengambil data DXY dengan proteksi kegagalan download."""
     try:
-        dxy = yf.download("^DXY", period="40d", interval="1d", progress=False)
-        tnx = yf.download("^TNX", period="40d", interval="1d", progress=False)
+        # Ganti ticker ke DX-Y.NYB biar lebih stabil
+        dxy = yf.download("DX-Y.NYB", period="5d", interval="1d", progress=False)
 
-        if dxy.empty or tnx.empty:
-            return {"dxy_val": 103.5, "dxy_rel": False, "tnx_val": 4.2, "tnx_rel": False, "time": "N/A"}
+        if not dxy.empty:
+            # Ambil harga closing terakhir yang asli
+            val = float(dxy['Close'].iloc[-1])
+            prev = float(dxy['Close'].iloc[-2])
+            return {
+                "dxy_val": val,
+                "dxy_rel": val > prev,  # Cek apakah naik dibanding kemarin
+                "is_real": True  # Penanda data asli
+            }
 
-        # Fix Multi-Index jika muncul di data makro
-        if isinstance(dxy.columns, pd.MultiIndex): dxy.columns = dxy.columns.get_level_values(0)
-        if isinstance(tnx.columns, pd.MultiIndex): tnx.columns = tnx.columns.get_level_values(0)
+        # Kalau gagal, kasih tau di log
+        print("⚠️ DXY Download Empty, using Fallback!")
+        return {"dxy_val": 0.0, "dxy_rel": False, "is_real": False}
 
-        dxy_last = float(dxy['Close'].iloc[-1])
-        dxy_ma = dxy['Close'].rolling(20).mean().iloc[-1]
-
-        tnx_last = float(tnx['Close'].iloc[-1])
-        tnx_ma = tnx['Close'].rolling(20).mean().iloc[-1]
-
-        return {
-            "dxy_val": dxy_last,
-            "dxy_rel": dxy_last > dxy_ma,
-            "tnx_val": tnx_last,
-            "tnx_rel": tnx_last > tnx_ma,
-            "time": datetime.now().strftime('%H:%M:%S')
-        }
-    except:
-        return {"dxy_val": 103.5, "dxy_rel": False, "tnx_val": 4.2, "tnx_rel": False, "time": "N/A"}
-
+    except Exception as e:
+        print(f"DXY Fetch Error: {e}")
+        return {"dxy_val": 0.0, "dxy_rel": False, "is_real": False}
 
 # --- 3. FOREX DATA ENGINE (STABLE VERSION) ---
 @st.cache_data(ttl=30)

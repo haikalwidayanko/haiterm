@@ -19,7 +19,10 @@ from ai_analyst import generate_strategic_verdict
 # UI Components Modular
 from quantum_ui import render_quantum_tab
 from astronacci_ui import render_astronacci_tab
+from smc_engine import deteksi_smc_v10
+from smc_ui import render_smc_tab
 from ai_ui import render_ai_intelligence_tab
+from ai_hub import generate_ai_judgment
 
 
 # --- 2. SECURITY GATE (STREAMLIT SECRETS) ---
@@ -133,6 +136,25 @@ if check_password():
         macro = fetch_macro_data()
         df_raw = fetch_forex_data(ticker, "60d", tf)
         df_active = hitung_indikator_lengkap(df_raw)
+        si, sd, raw_news = get_market_sentiment(ticker)
+
+        sentiment_explanation = ""
+        if raw_news and len(raw_news) > 0:
+            first_item = raw_news[0]
+
+            # Cek: Apakah item pertama itu Dictionary atau String?
+            if isinstance(first_item, dict):
+                # Kalau Dictionary, ambil field 'title'
+                top_title = first_item.get('title', str(first_item))
+            else:
+                # Kalau String, langsung ambil teksnya
+                top_title = str(first_item)
+
+            # Potong teks agar rapi di UI
+            sentiment_explanation = (top_title[:75] + '...') if len(top_title) > 75 else top_title
+        else:
+            sentiment_explanation = "No major news headlines found"
+
 
         # Hitung variabel ini di sini (Global), jangan di dalam Tab!
         news_alerts = check_news_shield(ticker)
@@ -145,13 +167,26 @@ if check_password():
         pct_delta = (price_delta / prev_close) * 100
         delta_color = "#00ffcc" if price_delta >= 0 else "#ff4b4b"
 
+        htf = "4h" if tf == "1h" else "1h"  # Kalau lo pake 15m, dia ngecek 1h
+
+        # 2. Tarik Data HTF buat cek Bias Bos Besar
+        df_htf_raw = fetch_forex_data(ticker, "60d", htf)
+        df_htf = hitung_indikator_lengkap(df_htf_raw)
+        last_htf = df_htf.iloc[-1]
+
+        # 3. Hitung Bias HTF (Simple: Harga vs EMA50)
+        htf_bias = 1 if last_htf['Close'] > last_htf['MA50'] else -1
+
         # Quantum Logic
         si, sd, _ = get_market_sentiment(ticker)
-        score_res = get_detailed_scores_v10(df_active, macro, si, 0)
-
+        # 4. Panggil Skor dengan MTF Bonus
+        score_res = get_detailed_scores_v10(df_active, macro, si, fib_levels, htf_bias, sentiment_explanation)
+        smc_zones = deteksi_smc_v10(df_active)
         # Proses Analisa AI Strategis (Jadikan Global untuk Notifikasi)
         analysis = generate_strategic_verdict(ticker, score_res, fib_levels, last_close, news_alerts)
-
+        # Variabel ai_analysis dibuat di sini (main.py)
+        # Tapi datanya diambil dari fungsi generate_ai_judgment (ai_hub.py)
+        ai_analysis = generate_ai_judgment(score_res, fib_levels, smc_zones, last_close)
         # Market Session Logic
         sessions, _, m_note, m_color = get_market_sessions()
 
@@ -225,7 +260,7 @@ if check_password():
                 st.session_state[notif_key] = True
 
         # --- 7. THE INTERFACE TABS ---
-        tab_q, tab_a, tab_ai = st.tabs(["⚛️ QUANTUM DATA", "🔭 ASTRONACCI", "🧠 AI HUB"])
+        tab_q, tab_a, tab_s, tab_ai = st.tabs(["⚛️ QUANTUM DATA", "🔭 ASTRONACCI", "🏦 SMC", "🧠 AI HUB"])
 
         with tab_q:
             # Menggunakan renderer dari quantum_ui.py
@@ -235,8 +270,14 @@ if check_password():
             # Menggunakan renderer dari astronacci_ui.py (High Conviction Logic)
             render_astronacci_tab(ticker, df_active)
 
+        with tab_s:
+            # Ambil data dari engine
+            smc_zones = deteksi_smc_v10(df_active)
+            # Render ke UI
+            render_smc_tab(smc_zones)
+
         with tab_ai:
-           render_ai_intelligence_tab(ticker, analysis)
+            render_ai_intelligence_tab(ticker, ai_analysis)
 
     except Exception as e:
         st.error(f"🛑 TERMINAL CORE ERROR: {e}")
