@@ -4,4 +4,5 @@ numpy
 yfinance
 pytz
 streamlit-autorefresh
+gnews
 requests
