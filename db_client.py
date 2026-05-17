@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 
-@st.cache_data
 def is_supabase_enabled() -> bool:
     """Check if Supabase credentials are configured in Streamlit Secrets."""
     try:
