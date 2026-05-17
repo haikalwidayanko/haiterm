@@ -129,6 +129,31 @@ def add_user(username, password, role, market_access, can_access_journal, telegr
             })
         except Exception as e:
             print(f"[Supabase] add_user error: {e}")
+            # Check if error is due to missing telegram_chat_id column
+            is_missing_tg = False
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    err_json = e.response.json()
+                    if "telegram_chat_id" in err_json.get("message", ""):
+                        is_missing_tg = True
+                except:
+                    pass
+            
+            if is_missing_tg:
+                print("[Supabase] telegram_chat_id column missing. Retrying without it...")
+                try:
+                    client.table("users").insert({
+                        "username": username,
+                        "password": hashed,
+                        "role": role,
+                        "market_access": market_access,
+                        "can_access_journal": can_access_journal
+                    })
+                except Exception as retry_err:
+                    print(f"[Supabase] Retry add_user error: {retry_err}")
+                    return False, f"Supabase error: {retry_err}"
+            else:
+                return False, f"Supabase error: {e}"
             
     db[username] = {
         "password": hashed,
@@ -156,6 +181,29 @@ def update_user(username, role, market_access, can_access_journal, telegram_chat
             })
         except Exception as e:
             print(f"[Supabase] update_user error: {e}")
+            # Check if error is due to missing telegram_chat_id column
+            is_missing_tg = False
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    err_json = e.response.json()
+                    if "telegram_chat_id" in err_json.get("message", ""):
+                        is_missing_tg = True
+                except:
+                    pass
+            
+            if is_missing_tg:
+                print("[Supabase] telegram_chat_id column missing. Retrying without it...")
+                try:
+                    client.table("users").eq("username", username).update({
+                        "role": role,
+                        "market_access": market_access,
+                        "can_access_journal": can_access_journal
+                    })
+                except Exception as retry_err:
+                    print(f"[Supabase] Retry update_user error: {retry_err}")
+                    return False, f"Supabase error: {retry_err}"
+            else:
+                return False, f"Supabase error: {e}"
             
     db[username]["role"] = role
     db[username]["market_access"] = market_access
@@ -163,6 +211,7 @@ def update_user(username, role, market_access, can_access_journal, telegram_chat
     db[username]["telegram_chat_id"] = telegram_chat_id
     _save_local_db(db)
     return True, "User updated successfully"
+
 def delete_user(username):
     db = _load_db()
     if db.get(username, {}).get("role") == "admin":
@@ -177,6 +226,7 @@ def delete_user(username):
                 client.table("users").eq("username", username).delete()
             except Exception as e:
                 print(f"[Supabase] delete_user error: {e}")
+                return False, f"Supabase error: {e}"
                 
         del db[username]
         _save_local_db(db)
@@ -195,6 +245,7 @@ def change_password(username, new_password):
                 })
             except Exception as e:
                 print(f"[Supabase] change_password error: {e}")
+                return False, f"Supabase error: {e}"
                 
         db[username]["password"] = hashed
         _save_local_db(db)
