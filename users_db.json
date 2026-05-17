@@ -1,0 +1,18 @@
+{
+    "admin": {
+        "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+        "role": "admin",
+        "allowed_pairs": [
+            "ALL"
+        ]
+    },
+    "haikalwidayanko": {
+        "password": "93f5c4a0e0fabfb1427cc42f08f9466466bf5fa8ac0992d12e7781bbd11165ba",
+        "role": "contributor",
+        "allowed_pairs": [
+            "ALL"
+        ],
+        "market_access": "ALL",
+        "can_access_journal": false
+    }
+}

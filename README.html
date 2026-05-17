@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widayanko Terminal V2.0 - Edukasi & Panduan Trading</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111;
+            --surface2: rgba(255, 255, 255, 0.03);
+            --primary: #00ffcc;
+            --secondary: #FFD700;
+            --danger: #ff4b4b;
+            --crypto: #a855f7;
+            --forex: #3b82f6;
+            --stocks: #f97316;
+            --bonds: #10b981;
+            --text-main: #eeeeee;
+            --text-muted: #888888;
+            --border: #222222;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 50px 20px;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Orbitron', sans-serif;
+            margin-top: 2em;
+            margin-bottom: 0.5em;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            color: var(--secondary);
+            text-align: center;
+            margin-top: 0.5em;
+            margin-bottom: 0.2em;
+            font-weight: 900;
+            letter-spacing: 3px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            margin-bottom: 3em;
+        }
+
+        h2 {
+            font-size: 2rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+            color: #fff;
+            margin-top: 3em;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-top: 2em;
+        }
+
+        p, li {
+            font-size: 1.05rem;
+            color: #cccccc;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .analogy-box {
+            background: rgba(255, 215, 0, 0.05);
+            border-left: 4px solid var(--secondary);
+            padding: 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 20px 0;
+        }
+        
+        .f1-box {
+            background: rgba(255, 75, 75, 0.05);
+            border-left: 4px solid var(--danger);
+            padding: 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 20px 0;
+        }
+        .f1-box h4 { margin-top: 0; color: var(--danger); font-family: 'Inter', sans-serif; font-style: italic; }
+
+        /* Chart Styles */
+        .chart-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 40px 30px;
+            margin: 30px 0;
+        }
+        .bar-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        .bar-label {
+            width: 140px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            color: #fff;
+            font-weight: 700;
+        }
+        .bar-track {
+            flex-grow: 1;
+            background: rgba(255,255,255,0.05);
+            height: 35px;
+            border-radius: 6px;
+            position: relative;
+            border: 1px solid #333;
+            margin-right: 15px;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 1s ease-in-out;
+        }
+        .bar-value {
+            width: 180px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #eee;
+            font-weight: bold;
+        }
+        /* Volume Proportions (Max $7.5T = 100%) */
+        .bar-forex { width: 100%; background: linear-gradient(90deg, #1d4ed8, var(--forex)); } 
+        .bar-commo { width: 50%; background: linear-gradient(90deg, #b45309, var(--secondary)); } 
+        .bar-bonds { width: 15%; background: linear-gradient(90deg, #047857, var(--bonds)); } 
+        .bar-stocks { width: 7%; background: linear-gradient(90deg, #c2410c, var(--stocks)); } 
+        .bar-crypto { width: 3%; background: linear-gradient(90deg, #7e22ce, var(--crypto)); color: #fff;} 
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 30px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+            background: var(--surface);
+        }
+        th, td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: #1a1a1a;
+            color: var(--secondary);
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
+            font-size: 14px;
+        }
+        td { color: #ddd; }
+        tr:hover { background-color: rgba(255,255,255,0.02); }
+
+        .footer {
+            text-align: center;
+            margin-top: 80px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>WIDAYANKO TERMINAL V2.0</h1>
+    <div class="subtitle">Buku Panduan Edukasi: Mekanika Pasar, Indikator F1, dan AI Trading</div>
+
+    <div class="card">
+        <p>Selamat datang di <strong>Widayanko Trade Terminal V2.0</strong>. Platform ini adalah "Otak Digital" yang didesain untuk membaca ribuan pergerakan harga per detik. Tujuan dari dokumen ini adalah murni <strong>EDUKASI</strong>—membekali Anda dengan pengetahuan mendalam tentang bagaimana uang berputar di dunia, bagaimana cara kita mengambil keuntungan dari perputaran tersebut, dan bagaimana cara membaca logika AI layaknya insinyur balap F1.</p>
+    </div>
+
+    <!-- BAGIAN 1: PERPUTARAN UANG -->
+    <h2>💰 Di Mana Uang Terbesar Berputar?</h2>
+    <p>Sebelum kita terjun ke pasar, kita harus tahu di kolam mana ikan raksasa berada. Kesalahan pemula adalah trading di pasar yang "sepi" sehingga harga mudah dimanipulasi bandar. Berikut adalah perbandingan <strong>Volume Transaksi Harian Global</strong> di 5 pasar utama dunia:</p>
+
+    <div class="chart-container">
+        <div class="bar-row">
+            <div class="bar-label" style="color:var(--forex)">FOREX</div>
+            <div class="bar-track"><div class="bar-fill bar-forex"></div></div>
+            <div class="bar-value">$7.5 Triliun / Hari</div>
+        </div>
+        <div class="bar-row">
+            <div class="bar-label" style="color:var(--secondary)">KOMODITAS</div>
+            <div class="bar-track"><div class="bar-fill bar-commo"></div></div>
+            <div class="bar-value">± $3.5 Triliun / Hari</div>
+        </div>
+        <div class="bar-row">
+            <div class="bar-label" style="color:var(--bonds)">OBLIGASI NEGARA</div>
+            <div class="bar-track"><div class="bar-fill bar-bonds"></div></div>
+            <div class="bar-value">± $1 Triliun / Hari</div>
+        </div>
+        <div class="bar-row">
+            <div class="bar-label" style="color:var(--stocks)">SAHAM GLOBAL</div>
+            <div class="bar-track"><div class="bar-fill bar-stocks"></div></div>
+            <div class="bar-value">± $500 Miliar / Hari</div>
+        </div>
+        <div class="bar-row">
+            <div class="bar-label" style="color:var(--crypto)">CRYPTO</div>
+            <div class="bar-track"><div class="bar-fill bar-crypto"></div></div>
+            <div class="bar-value">± $150 M / Hari</div>
+        </div>
+        <p style="font-size: 11px; color: #666; margin-top: 20px; text-align: center; font-family: 'JetBrains Mono', monospace;">
+            *Catatan: Grafik merepresentasikan proporsi skala volume. Forex memiliki likuiditas absolut terbesar di dunia sehingga mustahil dimonopoli oleh satu individu/bandar.
+        </p>
+    </div>
+
+
+    <!-- BAGIAN 2: BEDAH PASAR -->
+    <h2>🌍 Membedah Pilar Pasar Finansial</h2>
+
+    <h3 style="color:var(--forex)">1. PASAR FOREX (Valuta Asing)</h3>
+    <p><strong>Apa Itu Forex?</strong><br>
+    Foreign Exchange adalah pertukaran mata uang antar negara. Saat perusahaan Jepang membeli barang dari Amerika, mereka harus menukar Yen menjadi Dolar. Forex selalu berpasangan (Pairing), contoh: <strong>EUR/USD = 1.1000</strong>. Artinya, butuh 1.1 Dolar AS untuk membeli 1 Euro. Jika ekonomi Eropa membaik, Euro menguat, maka angka 1.1000 ini akan naik ke 1.1200.</p>
+
+    <p><strong>Siapa Dalang Utama Penggerak Forex?</strong><br>
+    Jawabannya adalah <strong>Bank Sentral</strong> tiap negara (seperti The Fed di AS). Bank Sentral memiliki senjata mematikan bernama <em>Suku Bunga (Interest Rates)</em>. Jika The Fed menaikkan suku bunga, investor seluruh dunia akan berebut menabung uangnya dalam bentuk Dolar karena bunganya tinggi. Akibatnya, Dolar AS akan menguat drastis, dan mata uang lain hancur.</p>
+    
+    <p><strong>Bagaimana Keuntungan Didapat?</strong><br>
+    Kita mendapat untung dari <em>selisih</em> nilai tukar. Jika Anda memprediksi Euro akan menguat terhadap Dolar (EUR/USD), Anda menekan tombol BUY. Saat harganya benar-benar naik, selisih kenaikannya adalah profit Anda. Keajaiban Forex adalah <em>Short Selling</em>: Anda bisa untung di tengah kehancuran sebuah negara dengan cara menekan tombol SELL sejak awal.</p>
+
+    <div class="analogy-box">
+        <strong>Kenapa Ada LEVERAGE (Daya Ungkit)?</strong><br>
+        Pergerakan mata uang negara itu sangat kecil, biasanya hanya nol koma sekian persen (0.01%) per hari. Jika Anda trading Rp 1.000.000 dan harga naik 1%, Anda cuma untung Rp 10.000. Membosankan, bukan?<br><br>
+        Di situlah Broker meminjamkan "Leverage" (Daya Ungkit), misalnya 1:100. Dengan modal Rp 1 Juta, broker memberi Anda kekuatan trading seolah Anda memiliki modal Rp 100 Juta. Kini, kenaikan 1% saja bisa memberi Anda untung Rp 1.000.000 (Profit 100% dari modal asli Anda)! <strong>Tapi awas:</strong> Leverage adalah pedang bermata dua. Jika harga berbalik melawan Anda sebesar 1%, modal 1 Juta Anda lenyap tak tersisa (Margin Call).
+    </div>
+
+    <h3 style="color:var(--secondary)">2. PASAR KOMODITAS</h3>
+    <p>Komoditas adalah barang mentah fisik dunia (Emas, Minyak, Kopi, Tembaga). Berbeda dengan Forex yang digerakkan oleh kebijakan Bank Sentral, harga Komoditas murni digerakkan oleh hukum <strong>Supply & Demand</strong>, perang, dan cuaca alam.</p>
+
+    <p><strong>Daftar 8 Komoditas Utama (The Elite Eight):</strong></p>
+    
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Komoditas</th>
+                    <th>Penghasil Terbesar (Dunia)</th>
+                    <th>Posisi Indonesia 🇮🇩</th>
+                    <th>Musim & Katalis Pendorong Harga</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Gold (Emas)</strong></td>
+                    <td>China (10%), Australia (9%), Rusia (9%)</td>
+                    <td>Ke-7 Dunia (~4% Global) (Grasberg, Papua)</td>
+                    <td><strong style="color:var(--secondary)">Safe Haven:</strong> Naik tajam saat inflasi, perang, atau Dolar AS melemah. Musim kawin di India (Oktober-November) sering memicu lonjakan <i>demand</i> perhiasan emas global.</td>
+                </tr>
+                <tr>
+                    <td><strong>Silver (Perak)</strong></td>
+                    <td>Meksiko (23%), China (12%), Peru (11%)</td>
+                    <td>Tidak Masuk Top 10 (< 1% Global)</td>
+                    <td>Mengekor emas, namun 60% digerakkan oleh industri (solar panel & elektronik). Harga melesat jika transisi energi hijau dunia sedang digenjot.</td>
+                </tr>
+                <tr>
+                    <td><strong>Copper (Tembaga)</strong></td>
+                    <td>Chile (25%), Peru (10%), Kongo (10%)</td>
+                    <td>Ke-6 Dunia (~4% Global) (Papua & Sumbawa)</td>
+                    <td><strong style="color:var(--primary)">Dr. Copper:</strong> Prediktor ekonomi. Jika China (pabrik dunia) sedang bangun banyak infrastruktur, harga tembaga pasti meroket.</td>
+                </tr>
+                <tr>
+                    <td><strong>Crude Oil (WTI)</strong></td>
+                    <td>AS (21%), Saudi (13%), Rusia (10%)</td>
+                    <td>Ke-22 Dunia (~1% Global)</td>
+                    <td><strong style="color:var(--danger)">Driving & Winter Season:</strong> Harga memuncak di Juli-Agustus (warga AS liburan musim panas pakai mobil) dan musim dingin ekstrim (butuh pemanas). Rentan meledak jika ada ketegangan geopolitik Timur Tengah.</td>
+                </tr>
+                <tr>
+                    <td><strong>Natural Gas</strong></td>
+                    <td>AS (25%), Rusia (15%), Iran (6%)</td>
+                    <td>Ke-13 Dunia (~1.5% Global)</td>
+                    <td>Sangat sensitif terhadap laporan cuaca. Badai salju (Blizzard) di Eropa/AS akan membuat harganya terbang ratusan persen dalam hitungan hari.</td>
+                </tr>
+                <tr>
+                    <td><strong>Coffee (Kopi)</strong></td>
+                    <td>Brasil (40%), Vietnam (20%), Kolombia (9%)</td>
+                    <td><strong>Ke-4 Dunia (~7% Global)</strong> (Robusta & Arabika)</td>
+                    <td><strong style="color:#a855f7">Frost Season (Juni-Agustus):</strong> Embun beku di Brasil sering membunuh tanaman kopi. Kabar gagal panen Brasil adalah katalis terkuat yang bikin harga kopi terbang ke bulan.</td>
+                </tr>
+                <tr>
+                    <td><strong>Cocoa (Kakao)</strong></td>
+                    <td>Pantai Gading (45%), Ghana (14%)</td>
+                    <td><strong>Ke-3 Dunia (~15% Global)</strong> (Sulawesi)</td>
+                    <td>Cuaca <i>Harmattan</i> (angin kering berdebu) atau penyakit busuk buah di Afrika Barat memicu defisit global dan melambungkan harga cokelat.</td>
+                </tr>
+                <tr>
+                    <td><strong>Wheat (Gandum)</strong></td>
+                    <td>China (17%), India (13%), Rusia (11%)</td>
+                    <td>Bukan Penghasil (0% Global / 100% Impor)</td>
+                    <td>Kekeringan di negara lumbung pangan atau perang (seperti blokade laut Hitam Rusia-Ukraina) adalah pemicu lonjakan harga gandum global.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3 style="color:var(--crypto)">3. PASAR CRYPTO</h3>
+    <p><strong>Mengapa Crypto Diciptakan? (Konsep Desentralisasi)</strong><br>
+    Bayangkan Anda ingin mengirim Rp 10 Miliar ke saudara di Amerika. Lewat bank, Anda akan ditanya uang dari mana, dipotong biaya transfer jutaan rupiah, dan butuh waktu berhari-hari. Crypto (seperti Bitcoin) adalah revolusi <em>Blockchain</em>—buku kas raksasa transparan yang tidak dikendalikan pemerintah manapun. Anda bisa mengirim triliunan rupiah dalam hitungan menit, dengan biaya sangat murah, dan tidak ada satu otoritas pun yang bisa memblokir akun Anda.</p>
+
+    <p><strong>Hukum Kelangkaan Mutlak (Bitcoin Halving)</strong><br>
+    Pemerintah bisa mencetak uang kertas tanpa batas, menyebabkan nilai uang kita menyusut tiap tahun (Inflasi). Bitcoin berbeda. Kode komputernya mengunci suplai maksimal hanya 21 juta keping di dunia. Lebih gila lagi, ada sistem <em>Halving</em> tiap 4 tahun di mana produksi Bitcoin baru dipotong setengahnya. <strong>Ketika barang semakin langka, namun permintaan (Demand) terus naik dari institusi Wall Street, secara matematis harganya dipaksa terbang ke bulan.</strong></p>
+
+    <p><strong>Bagaimana Crypto Bekerja & Penggerak Harganya:</strong><br>
+    Nilai "koin lain" (Altcoin) ditentukan oleh kegunaan teknologinya (Utility). Ethereum (ETH) berharga tinggi karena ia adalah "komputer global" tempat aplikasi keuangan berjalan secara otomatis tanpa campur tangan manusia (Smart Contract). Solana (SOL) berharga karena kecepatan transaksinya yang sanggup menandingi VISA. Namun ingat, karena tidak ada "Bank Sentral" yang menjaga kestabilan harga, crypto bisa terbang ratusan persen, atau longsor parah dalam sehari hanya karena satu kicauan panik di Twitter.</p>
+
+
+    <!-- BAGIAN 3: INDIKATOR DENGAN ANALOGI F1 -->
+    <h2>🏎️ Anatomi Mesin Quantum V2.0 (Analogi Formula 1)</h2>
+    <p>Untuk memenangkan pasar, Widayanko Terminal menggunakan berbagai "onderdil" indikator teknikal. Bayangkan kita sedang membangun mobil Formula 1. Tiap indikator punya fungsi vital yang saling melengkapi.</p>
+
+    <div class="f1-box">
+        <h4>1. DXY (U.S. Dollar Index) — Cuaca di Sirkuit</h4>
+        <p><strong>Fungsi Asli:</strong> Mengukur kekuatan Dolar AS terhadap keranjang mata uang negara-negara maju (Euro, Yen, Pound).<br>
+        <strong>Korelasi:</strong> Dolar AS adalah raja. Jika Dolar kuat, harga instrumen yang berpasangan dengan Dolar (seperti Emas/XAU, EUR/USD, Bitcoin) akan ditekan <strong>TURUN</strong>.</p>
+        <p><strong>🏁 Analogi F1:</strong> DXY adalah cuaca di sirkuit. Jika DXY sedang "Badai" (Dolar naik tajam), mobil-mobil lain tertahan dan melambat (Harga Emas/Crypto turun). Pembalap (trader) tidak bisa melawan cuaca, kita harus beradaptasi mengganti ban (strategi Sell/Short).</p>
+    </div>
+
+    <div class="f1-box">
+        <h4>2. EMA (Exponential Moving Average) — Mesin Penggerak (Top Speed)</h4>
+        <p><strong>Fungsi Asli:</strong> Menghitung harga rata-rata secara mulus yang lebih merespon harga terbaru. EMA 50 & EMA 200 adalah standar institusi.<br>
+        <strong>Korelasi:</strong> Harga di atas EMA = Tren Naik. Harga di bawah EMA = Tren Turun.</p>
+        <p><strong>🏁 Analogi F1:</strong> Ini adalah mesin utama. EMA menunjukkan ke arah mana mobil balap sedang dipacu. Jika mesin menggeram ke arah depan (Uptrend), sangat bodoh jika Anda nekat memasukkan persneling mundur (Counter-trend trading). Jangan pernah melawan momentum mesin!</p>
+    </div>
+
+    <div class="f1-box">
+        <h4>3. Bollinger Bands (BB) — Garis Pembatas Lintasan</h4>
+        <p><strong>Fungsi Asli:</strong> Dua pita pembatas (atas dan bawah) yang mengukur volatilitas (keliaran harga). <br>
+        <strong>Korelasi:</strong> Jika harga menabrak pita atas, harga sudah terlampau mahal (Overbought). Jika pita menyempit rapat (Squeeze), itu tanda harga sedang mengumpulkan energi untuk meledak besar.</p>
+        <p><strong>🏁 Analogi F1:</strong> Ini adalah garis putih dan pembatas pinggir lintasan sirkuit. Mobil balap bebas melaju ke kiri dan ke kanan di dalamnya, tapi jika mobil mulai menyerempet tembok pembatas lintasan (Upper Band), ia harus segera membanting setir ke tengah agar tidak hancur.</p>
+    </div>
+
+    <div class="f1-box">
+        <h4>4. MACD (Moving Average Convergence Divergence) — Indikator RPM (Gas/Rem)</h4>
+        <p><strong>Fungsi Asli:</strong> Mengukur kapan momentum harga mulai kehabisan bensin atau justru mendapat dorongan baru (Crossover garis sinyal).<br></p>
+        <p><strong>🏁 Analogi F1:</strong> Ini adalah layar RPM di setir. MACD memberi tahu kita apakah pembalap sedang menginjak pedal gas (Bullish) atau rem (Bearish). Bahkan jika mobil masih melaju 300 km/jam, jika RPM mulai turun mendadak (Divergence), itu pertanda mobil akan melambat di tikungan berikutnya.</p>
+    </div>
+
+    <div class="f1-box">
+        <h4>5. RSI (Relative Strength Index) — Suhu Ban & Radiator</h4>
+        <p><strong>Fungsi Asli:</strong> Skala 0-100 yang mengukur kecepatan kenaikan/penurunan. Di atas 70 artinya Jenuh Beli (mau turun), di bawah 30 Jenuh Jual (mau naik).</p>
+        <p><strong>🏁 Analogi F1:</strong> Ini adalah alarm Suhu Ban dan Mesin. Jika ban terlalu panas (RSI 80+), mobil wajib dikurangi kecepatannya atau masuk pit-stop untuk pendinginan. Tidak mungkin mobil balap melaju kencang dengan suhu mesin terbakar terus menerus tanpa meledak.</p>
+    </div>
+
+    <div class="f1-box">
+        <h4>6. Fibonacci Retracement — Posko Pit-Stop</h4>
+        <p><strong>Fungsi Asli:</strong> Rasio matematis (Golden Ratio: 0.500, 0.618) yang digunakan jutaan trader dunia untuk memprediksi di titik koordinat mana harga akan "memantul" saat sedang istirahat sejenak (Koreksi).</p>
+        <p><strong>🏁 Analogi F1:</strong> Ini adalah letak posko Pit-Stop. Setelah melaju sangat kencang, mobil wajib mundur sedikit (koreksi) untuk ganti ban. Fibonacci (terutama area 61.8%) adalah koordinat di mana mekanik berdiri menunggu mobil. Kita meletakkan uang/order kita persis di titik Pit-Stop ini karena kita tahu mobil akan berhenti sebentar di situ sebelum kembali nge-gas.</p>
+    </div>
+
+    <div class="f1-box">
+        <h4>7. SMC (Smart Money Concepts) — Taktik Spionase Tim Rival</h4>
+        <p><strong>Fungsi Asli:</strong> Mendeteksi jejak kaki uang Institusi/Bank Besar (Order Block) dan di mana mereka memasang jebakan penghancur dompet retail (Stop Hunt / Liquidity Sweep).</p>
+        <p><strong>🏁 Analogi F1:</strong> Ini adalah sistem telemetri spionase. SMC membaca taktik tim rival raksasa seperti Red Bull atau Ferrari. Di tikungan mana mereka akan mengerem, dan di mana mereka sengaja melambat untuk menjebak pembalap amatir. Dengan SMC, kita membuntuti tim juara dari belakang, masuk ke pusaran angin mereka (Slipstream), lalu ikut melesat aman tanpa repot membelah angin.</p>
+    </div>
+
+
+    <!-- BAGIAN 4: AI JUDGEMENT -->
+    <h2>🧠 AI Judgement (Direktur Balap F1 Anda)</h2>
+    
+    <p>Bayangkan Anda duduk sendirian di kokpit mobil F1 berkecepatan 300 km/jam, harus melihat layar RPM (MACD), suhu ban (RSI), batas lintasan (BB), sambil memantau radar cuaca (DXY). Otak manusia akan kelebihan beban (Overload) dan berakhir dengan tabrakan (Loss/Bangkrut).</p>
+
+    <p><strong>Di sinilah AI Quantum V2.0 bertindak sebagai Team Principal (Direktur Balap) Anda di radio komunikasi pit-wall.</strong></p>
+
+    <div class="card">
+        <h3>Prosedur Pengambilan Keputusan AI</h3>
+        <p>AI memproses semua telemetri di atas secara instan lalu mengeluarkan penilaian akhir (Q-Score):</p>
+        <ol>
+            <li><strong>Mengecek Mesin (EMA & Trend Besar):</strong> AI mengecek apakah mobil kuat maju mundur. Jika bagus, poin plus.</li>
+            <li><strong>Mengecek Suhu (RSI):</strong> Jika ban sedang <em>overheat</em> (RSI 80), AI menahan Anda agar tidak memaksakan BUY.</li>
+            <li><strong>Mengecek Cuaca Makro:</strong> AI membaca rilis berita ekonomi (Kalender) dan DXY. Jika badai inflasi datang, AI menyusun strategi baru.</li>
+            <li><strong>Menunggu di Pit-Stop (Fib & SMC):</strong> AI tidak menyuruh Anda masuk sembarangan. AI menunggu harga mundur tepat ke titik Fibonacci atau Order Block Institusi, meminimalkan risiko tertabrak.</li>
+        </ol>
+
+        <p>Pada akhirnya, AI akan bersuara di radio Anda lewat Terminal:</p>
+        <ul>
+            <li><strong>STANDBY (Q-Score Lemah):</strong> <i>"Lintasan basah, ban belum panas, tetap di pit."</i> (Jangan memaksakan trading).</li>
+            <li><strong>EXECUTE BUY (Q-Score ≥ 8):</strong> <i>"Taktik rival sudah terbaca, suhu mesin optimal, masuk sekarang! Ini titik harganya, ini target akhirnya, dan ini batas asuransinya (Stop Loss)."</i></li>
+        </ul>
+    </div>
+
+    <p style="text-align: center; color: var(--primary); font-family: 'Orbitron', sans-serif; margin-top: 50px; font-size: 1.25rem;">
+        Trading bukanlah berjudi tebak harga. <br>Trading adalah mengeksekusi probabilitas dengan kedisiplinan mekanik F1.
+    </p>
+
+    <div class="footer">
+        <p>Widayanko Trade Terminal V2.0 | Quantum AI Engine<br>
+        "Trade Like a Sniper, Not a Machine Gunner"</p>
+    </div>
+</div>
+
+</body>
+</html>
