@@ -239,7 +239,45 @@ def _render_trade_card(t):
 
     # Manual close controls for OPEN trades
     if status == "OPEN":
-        with st.expander(f"📝 Tutup Manual — {t['id']}", expanded=False):
+        with st.expander(f"📝 Tutup Manual / Otomatis — {t['id']}", expanded=False):
+            st.markdown("<p style='font-size:11px;color:#aaa;margin-bottom:8px;'>Tutup instant dengan harga pasar saat ini:</p>", unsafe_allow_html=True)
+            if st.button("⚡ Tutup Otomatis (Harga Pasar)", key=f"btn_auto_{t['id']}", use_container_width=True):
+                import yfinance as yf
+                from journal import close_trade
+                
+                with st.spinner("Mengambil harga pasar..."):
+                    ticker_obj = yf.Ticker(t["ticker"])
+                    hist = ticker_obj.history(period="1d", interval="1m")
+                    if not hist.empty:
+                        curr_price = float(hist["Close"].iloc[-1])
+                        
+                        # Calculate pips
+                        is_jpy = "JPY" in t["ticker"]
+                        is_commodity = t["ticker"].endswith("=F")
+                        is_crypto = "-USD" in t["ticker"]
+                        
+                        pip_mult = 1 if is_crypto or is_commodity else (100 if is_jpy else 10000)
+                        entry_p = t.get("entry_price", 0)
+                        direction = t.get("direction", "BUY")
+                        
+                        diff = curr_price - entry_p if direction == "BUY" else entry_p - curr_price
+                        pips = diff * pip_mult
+                        
+                        if pips > 0:
+                            res = "WIN"
+                        elif pips < 0:
+                            res = "LOSS"
+                        else:
+                            res = "BE"
+                            
+                        close_trade(t['id'], res, curr_price, pips, "Ditutup otomatis via Harga Pasar")
+                        st.toast(f"Trade {t['id']} ditutup otomatis ({res} {pips:+.1f} pips)", icon="⚡")
+                        st.rerun()
+                    else:
+                        st.error("Gagal mengambil harga pasar terbaru.")
+            
+            st.markdown("<hr style='border-color:#333;margin:12px 0;'/>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:11px;color:#aaa;margin-bottom:8px;'>Atau input manual:</p>", unsafe_allow_html=True)
             rc1, rc2, rc3 = st.columns(3)
             with rc1:
                 result = st.selectbox("Hasil", ["WIN", "LOSS", "BE"], key=f"res_{t['id']}")
@@ -251,7 +289,7 @@ def _render_trade_card(t):
 
             sc1, sc2 = st.columns(2)
             with sc1:
-                if st.button("🏁 Selesaikan Trade", key=f"btn_close_{t['id']}", use_container_width=True):
+                if st.button("🏁 Simpan Manual", key=f"btn_close_{t['id']}", use_container_width=True):
                     from journal import close_trade
                     close_trade(t['id'], result, exit_price, pips, notes)
                     st.toast(f"Trade {t['id']} ditutup dengan hasil {result}", icon="🏁")
