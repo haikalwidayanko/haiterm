@@ -108,29 +108,26 @@ def _render_pending_signals():
         entry_p = t.get("entry_price", 0)
         fmt = (lambda v: f"{v:,.3f}" if v else "—") if entry_p > 10 else (lambda v: f"{v:,.5f}" if v else "—")
 
-        st.markdown(f"""
-            <div style="background:rgba(255,215,0,0.06);border:1px solid #FFD70044;border-left:4px solid #FFD700;
-                        border-radius:10px;padding:14px 16px;margin-bottom:10px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                    <div>
-                        <span style="font-family:'Orbitron';font-size:16px;color:#eee;font-weight:900;">
-                            {t.get('pair_name', '')}
-                        </span>
-                        <span style="font-family:'Orbitron';font-size:10px;color:{dec_color};margin-left:8px;
-                                     background:{dec_color}15;padding:2px 8px;border-radius:4px;">
-                            {t.get('decision', '')}
-                        </span>
-                        <span style="font-size:10px;color:#555;margin-left:8px;">{t.get('timestamp', '')}</span>
-                    </div>
-                    <span style="font-family:'Orbitron';font-size:10px;color:#FFD700;">⏳ MENUNGGU</span>
-                </div>
-                <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#888;flex-wrap:wrap;">
-                    <span>Entry: <b style="color:#ccc;">{fmt(entry_p)}</b></span>
-                    <span>SL: <b style="color:#ff4b4b;">{fmt(t.get('sl'))}</b></span>
-                    <span>TP1: <b style="color:#00ffcc;">{fmt(t.get('tp1'))}</b></span>
-                    <span>TP2: <b style="color:#00ffcc;">{fmt(t.get('tp2'))}</b></span>
-                    <span>Q: <b style="color:#ccc;">{t.get('q_score', 0):+}</b></span>
-                </div></div>""", unsafe_allow_html=True)
+        html_str = f"""
+<div style="background:rgba(255,215,0,0.06);border:1px solid #FFD70044;border-left:4px solid #FFD700;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+            <span style="font-family:'Orbitron';font-size:16px;color:#eee;font-weight:900;">{t.get('pair_name', '')}</span>
+            <span style="font-family:'Orbitron';font-size:10px;color:{dec_color};margin-left:8px;background:{dec_color}15;padding:2px 8px;border-radius:4px;">{t.get('decision', '')}</span>
+            <span style="font-size:10px;color:#555;margin-left:8px;">{t.get('timestamp', '')}</span>
+        </div>
+        <span style="font-family:'Orbitron';font-size:10px;color:#FFD700;">⏳ MENUNGGU</span>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#888;flex-wrap:wrap;">
+        <span>Entry: <b style="color:#ccc;">{fmt(entry_p)}</b></span>
+        <span>SL: <b style="color:#ff4b4b;">{fmt(t.get('sl'))}</b></span>
+        <span>TP1: <b style="color:#00ffcc;">{fmt(t.get('tp1'))}</b></span>
+        <span>TP2: <b style="color:#00ffcc;">{fmt(t.get('tp2'))}</b></span>
+        <span>Q: <b style="color:#ccc;">{t.get('q_score', 0):+}</b></span>
+    </div>
+</div>
+"""
+        st.markdown(html_str, unsafe_allow_html=True)
 
         bc1, bc2 = st.columns(2)
         with bc1:
@@ -211,38 +208,34 @@ def _render_trade_card(t):
     if t.get("closed_at"):
         closed_info = f"<span style='font-size:9px;color:#666;margin-left:8px;'>Ditutup: {t['closed_at']}</span>"
 
-    st.markdown(f"""
-        <div style="background:{bg};border:1px solid #222;border-left:4px solid {border_color};
-                    border-radius:10px;padding:14px 16px;margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <div>
-                    <span style="font-family:'Orbitron';font-size:16px;color:#eee;font-weight:900;">
-                        {t.get('pair_name', t.get('ticker', ''))}
-                    </span>
-                    <span style="font-family:'Orbitron';font-size:10px;color:{dec_color};margin-left:8px;
-                                 background:{dec_color}15;padding:2px 8px;border-radius:4px;">
-                        {decision}
-                    </span>
-                    <span style="font-size:10px;color:#555;margin-left:8px;">{t.get('timestamp', '')}</span>
-                </div>
-                <div style="text-align:right;">
-                    <span style="font-family:'Orbitron';font-size:11px;color:{border_color};font-weight:700;">
-                        {status_badge}
-                    </span>
-                    <span style="font-family:'JetBrains Mono';font-size:13px;color:{pips_color};margin-left:10px;">
-                        {pips_txt}
-                    </span>
-                </div>
-            </div>
-            <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:#888;flex-wrap:wrap;">
-                <span>Entry: <b style="color:#ccc;">{fmt(entry_p)}</b></span>
-                <span>SL: <b style="color:#ff4b4b;">{fmt(t.get('sl'))}</b></span>
-                <span>TP1: <b style="color:#a3ffeb;">{fmt(t.get('tp1'))}</b></span>
-                <span>TP2: <b style="color:#00ffcc;">{fmt(t.get('tp2'))}</b></span>
-                <span>Q: <b style="color:#ccc;">{t.get('q_score', 0):+}</b></span>
-                <span>Conf: <b style="color:#ccc;">{t.get('confidence', 0)}%</b></span>
-                {closed_info}
-            </div>{f'<p style="font-size:10px;color:#666;margin:6px 0 0;font-style:italic;">📝 {t.get("notes")}</p>' if t.get("notes") else ""}</div>""", unsafe_allow_html=True)
+    notes_html = f'<p style="font-size:10px;color:#666;margin:6px 0 0;font-style:italic;">📝 {t.get("notes")}</p>' if t.get("notes") else ''
+    
+    html_str = f"""
+<div style="background:{bg};border:1px solid #222;border-left:4px solid {border_color};border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+            <span style="font-family:'Orbitron';font-size:16px;color:#eee;font-weight:900;">{t.get('pair_name', t.get('ticker', ''))}</span>
+            <span style="font-family:'Orbitron';font-size:10px;color:{dec_color};margin-left:8px;background:{dec_color}15;padding:2px 8px;border-radius:4px;">{decision}</span>
+            <span style="font-size:10px;color:#555;margin-left:8px;">{t.get('timestamp', '')}</span>
+        </div>
+        <div style="text-align:right;">
+            <span style="font-family:'Orbitron';font-size:11px;color:{border_color};font-weight:700;">{status_badge}</span>
+            <span style="font-family:'JetBrains Mono';font-size:13px;color:{pips_color};margin-left:10px;">{pips_txt}</span>
+        </div>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:#888;flex-wrap:wrap;">
+        <span>Entry: <b style="color:#ccc;">{fmt(entry_p)}</b></span>
+        <span>SL: <b style="color:#ff4b4b;">{fmt(t.get('sl'))}</b></span>
+        <span>TP1: <b style="color:#a3ffeb;">{fmt(t.get('tp1'))}</b></span>
+        <span>TP2: <b style="color:#00ffcc;">{fmt(t.get('tp2'))}</b></span>
+        <span>Q: <b style="color:#ccc;">{t.get('q_score', 0):+}</b></span>
+        <span>Conf: <b style="color:#ccc;">{t.get('confidence', 0)}%</b></span>
+        {closed_info}
+    </div>
+    {notes_html}
+</div>
+"""
+    st.markdown(html_str, unsafe_allow_html=True)
 
     # Manual close controls for OPEN trades
     if status == "OPEN":
