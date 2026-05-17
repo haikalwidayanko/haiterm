@@ -127,7 +127,7 @@ def _render_pending_signals():
     </div>
 </div>
 """
-        st.markdown(html_str, unsafe_allow_html=True)
+        st.markdown(html_str.replace('\n', ''), unsafe_allow_html=True)
 
         bc1, bc2 = st.columns(2)
         with bc1:
@@ -235,7 +235,7 @@ def _render_trade_card(t):
     {notes_html}
 </div>
 """
-    st.markdown(html_str, unsafe_allow_html=True)
+    st.markdown(html_str.replace('\n', ''), unsafe_allow_html=True)
 
     # Manual close controls for OPEN trades
     if status == "OPEN":
