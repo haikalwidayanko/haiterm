@@ -137,3 +137,19 @@ def render_admin_dashboard():
                             st.rerun()
                         else:
                             st.error(msg)
+                            
+            # Password Change Form
+            with st.form(f"pass_form_{uname}"):
+                new_pass = st.text_input("New Password", type="password", key=f"newpass_{uname}")
+                submit_pass = st.form_submit_button("Change Password")
+                
+                if submit_pass:
+                    if not new_pass:
+                        st.error("Password cannot be empty")
+                    else:
+                        from auth import change_password
+                        success, msg = change_password(uname, new_pass)
+                        if success:
+                            st.success(msg)
+                        else:
+                            st.error(msg)

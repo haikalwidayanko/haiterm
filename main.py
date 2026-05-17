@@ -375,8 +375,10 @@ def _render_heatmap():
 # LANDING PAGE
 # ============================================================
 if st.session_state.app_view == "landing":
-    st.markdown("""
+    uname = st.session_state.get('username', 'TRADER').upper()
+    st.markdown(f"""
         <div style="padding:40px 0 20px; text-align:center;">
+            <p style="font-family:'Orbitron';color:#FFD700;font-size:12px;letter-spacing:3px;margin-bottom:10px;">WELCOME, {uname}</p>
             <h1 style="font-family:'Orbitron';color:#00ffcc;font-size:36px;letter-spacing:6px;margin:0;">WIDAYANKO-TERMINAL</h1>
             <p style="color:#888;font-size:14px;letter-spacing:2px;margin-top:10px;">COMMAND CENTER</p>
         </div>

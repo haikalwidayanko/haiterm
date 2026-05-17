@@ -138,12 +138,12 @@ def _render_pending_signals():
         with bc1:
             if st.button(f"✅ Ikut Rekomendasi", key=f"follow_{t['id']}", use_container_width=True):
                 follow_signal(t["id"])
-                st.success(f"Trade {t.get('pair_name', '')} OPEN — simulasi dimulai!")
+                st.toast(f"Trade {t.get('pair_name', '')} OPEN — simulasi dimulai!", icon="✅")
                 st.rerun()
         with bc2:
             if st.button(f"⏭️ Tidak Ikut", key=f"skip_{t['id']}", use_container_width=True):
                 skip_signal(t["id"])
-                st.info(f"Sinyal {t.get('pair_name', '')} dilewati")
+                st.toast(f"Sinyal {t.get('pair_name', '')} dilewati", icon="⏭️")
                 st.rerun()
 
     st.divider()
@@ -264,12 +264,13 @@ def _render_trade_card(t):
 
                 sc1, sc2 = st.columns(2)
                 with sc1:
-                    if st.form_submit_button("✅ Tutup Trade", use_container_width=True):
-                        close_trade(t["id"], result, exit_price, pips, notes, "MANUAL")
-                        st.success(f"Trade {t['id']} ditutup → {result}")
+                    if st.form_submit_button("🏁 Selesaikan Trade", use_container_width=True):
+                        from journal import close_trade
+                        close_trade(t['id'], result, exit_price, pips, notes)
+                        st.toast(f"Trade {t['id']} ditutup dengan hasil {result}", icon="🏁")
                         st.rerun()
                 with sc2:
                     if st.form_submit_button("🗑️ Hapus", use_container_width=True):
                         delete_trade(t["id"])
-                        st.warning(f"Trade {t['id']} dihapus")
+                        st.toast(f"Trade {t['id']} dihapus", icon="🗑️")
                         st.rerun()
