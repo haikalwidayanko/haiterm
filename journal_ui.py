@@ -130,9 +130,7 @@ def _render_pending_signals():
                     <span>TP1: <b style="color:#00ffcc;">{fmt(t.get('tp1'))}</b></span>
                     <span>TP2: <b style="color:#00ffcc;">{fmt(t.get('tp2'))}</b></span>
                     <span>Q: <b style="color:#ccc;">{t.get('q_score', 0):+}</b></span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+                </div></div>""", unsafe_allow_html=True)
 
         bc1, bc2 = st.columns(2)
         with bc1:
@@ -244,10 +242,7 @@ def _render_trade_card(t):
                 <span>Q: <b style="color:#ccc;">{t.get('q_score', 0):+}</b></span>
                 <span>Conf: <b style="color:#ccc;">{t.get('confidence', 0)}%</b></span>
                 {closed_info}
-            </div>
-            {f'<p style="font-size:10px;color:#666;margin:6px 0 0;font-style:italic;">📝 {t.get("notes")}</p>' if t.get("notes") else ""}
-        </div>
-    """, unsafe_allow_html=True)
+            </div>{f'<p style="font-size:10px;color:#666;margin:6px 0 0;font-style:italic;">📝 {t.get("notes")}</p>' if t.get("notes") else ""}</div>""", unsafe_allow_html=True)
 
     # Manual close controls for OPEN trades
     if status == "OPEN":
