@@ -23,7 +23,8 @@ def _load_db() -> dict:
                     "password": row["password"],
                     "role": row["role"],
                     "market_access": row["market_access"],
-                    "can_access_journal": row["can_access_journal"]
+                    "can_access_journal": row["can_access_journal"],
+                    "telegram_chat_id": row.get("telegram_chat_id", "")
                 }
             return db
         except Exception as e:
@@ -45,7 +46,7 @@ def init_db():
     db = _load_db()
     if not db:
         # Create default admin
-        add_user("admin", "admin123", "admin", "ALL", True)
+        add_user("admin", "admin123", "admin", "ALL", True, "")
 
 def authenticate(username, password):
     db = _load_db()
@@ -99,7 +100,17 @@ def get_user_config(username):
 def get_all_users():
     return _load_db()
 
-def add_user(username, password, role, market_access, can_access_journal):
+def get_all_telegram_ids():
+    """Returns a list of all non-empty telegram chat IDs from all users."""
+    db = _load_db()
+    ids = []
+    for uname, data in db.items():
+        chat_id = data.get("telegram_chat_id", "").strip()
+        if chat_id:
+            ids.append(chat_id)
+    return list(set(ids))
+
+def add_user(username, password, role, market_access, can_access_journal, telegram_chat_id=""):
     db = _load_db()
     if username in db:
         return False, "User already exists"
@@ -113,7 +124,8 @@ def add_user(username, password, role, market_access, can_access_journal):
                 "password": hashed,
                 "role": role,
                 "market_access": market_access,
-                "can_access_journal": can_access_journal
+                "can_access_journal": can_access_journal,
+                "telegram_chat_id": telegram_chat_id
             })
         except Exception as e:
             print(f"[Supabase] add_user error: {e}")
@@ -122,12 +134,13 @@ def add_user(username, password, role, market_access, can_access_journal):
         "password": hashed,
         "role": role,
         "market_access": market_access,
-        "can_access_journal": can_access_journal
+        "can_access_journal": can_access_journal,
+        "telegram_chat_id": telegram_chat_id
     }
     _save_local_db(db)
     return True, "User created successfully"
 
-def update_user(username, role, market_access, can_access_journal):
+def update_user(username, role, market_access, can_access_journal, telegram_chat_id=""):
     db = _load_db()
     if username not in db:
         return False, "User not found"
@@ -138,7 +151,8 @@ def update_user(username, role, market_access, can_access_journal):
             client.table("users").eq("username", username).update({
                 "role": role,
                 "market_access": market_access,
-                "can_access_journal": can_access_journal
+                "can_access_journal": can_access_journal,
+                "telegram_chat_id": telegram_chat_id
             })
         except Exception as e:
             print(f"[Supabase] update_user error: {e}")
@@ -146,9 +160,9 @@ def update_user(username, role, market_access, can_access_journal):
     db[username]["role"] = role
     db[username]["market_access"] = market_access
     db[username]["can_access_journal"] = can_access_journal
+    db[username]["telegram_chat_id"] = telegram_chat_id
     _save_local_db(db)
     return True, "User updated successfully"
-
 def delete_user(username):
     db = _load_db()
     if db.get(username, {}).get("role") == "admin":

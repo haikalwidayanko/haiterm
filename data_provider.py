@@ -102,12 +102,32 @@ def get_ticker_group(ticker):
 
 def send_telegram_alert(message):
     try:
-        token = st.secrets["telegram_token"]
-        chat_id = st.secrets["telegram_chat_id"]
+        token = st.secrets.get("telegram_token", "")
+        if not token:
+            return
+            
+        # Get master chat ID from secrets
+        chat_ids = set()
+        if "telegram_chat_id" in st.secrets:
+            chat_ids.add(str(st.secrets["telegram_chat_id"]))
+            
+        # Get contributor chat IDs from database
+        try:
+            from auth import get_all_telegram_ids
+            for tid in get_all_telegram_ids():
+                if tid:
+                    chat_ids.add(str(tid))
+        except Exception as e:
+            print(f"Error fetching telegram IDs from DB: {e}")
+            
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(url, data={"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}, timeout=5)
+        for cid in chat_ids:
+            try:
+                requests.post(url, data={"chat_id": cid, "text": message, "parse_mode": "Markdown"}, timeout=5)
+            except Exception as e:
+                print(f"Telegram error sending to {cid}: {e}")
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print(f"Telegram alert error: {e}")
 
 
 @st.cache_data(ttl=120, show_spinner=False)

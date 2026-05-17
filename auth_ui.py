@@ -81,16 +81,17 @@ def render_admin_dashboard():
             new_role = st.selectbox("Role", ["contributor", "admin"])
             
             # Select market access
-            st.write("Permissions")
+            st.write("Permissions & Notifications")
             market_access = st.selectbox("Market Access", ["ALL", "COMMODITIES", "FOREX_CRYPTO"])
             can_access_journal = st.checkbox("Can Access Trade Journal", value=True)
+            new_telegram_id = st.text_input("Telegram Chat ID (opsional)", help="Masukkan Chat ID numerik agar bot bisa mengirim sinyal ke akun Telegram ini.")
 
             submit_add = st.form_submit_button("Create User")
             if submit_add:
                 if not new_username or not new_password:
                     st.error("Username and password are required")
                 else:
-                    success, msg = add_user(new_username, new_password, new_role, market_access, can_access_journal)
+                    success, msg = add_user(new_username, new_password, new_role, market_access, can_access_journal, new_telegram_id)
                     if success:
                         st.success(msg)
                         st.rerun()
@@ -107,11 +108,13 @@ def render_admin_dashboard():
                 
                 curr_market = details.get("market_access", "ALL")
                 curr_journal = details.get("can_access_journal", True)
+                curr_telegram_id = details.get("telegram_chat_id", "")
                 
                 idx_market = ["ALL", "COMMODITIES", "FOREX_CRYPTO"].index(curr_market) if curr_market in ["ALL", "COMMODITIES", "FOREX_CRYPTO"] else 0
                 
                 edit_market = st.selectbox("Market Access", ["ALL", "COMMODITIES", "FOREX_CRYPTO"], index=idx_market, key=f"market_{uname}")
                 edit_journal = st.checkbox("Can Access Trade Journal", value=curr_journal, key=f"journal_{uname}")
+                edit_telegram_id = st.text_input("Telegram Chat ID", value=curr_telegram_id, key=f"tg_{uname}")
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -120,7 +123,7 @@ def render_admin_dashboard():
                     submit_delete = st.form_submit_button("Delete User", type="primary")
 
                 if submit_update:
-                    success, msg = update_user(uname, edit_role, edit_market, edit_journal)
+                    success, msg = update_user(uname, edit_role, edit_market, edit_journal, edit_telegram_id)
                     if success:
                         st.success(msg)
                         st.rerun()
