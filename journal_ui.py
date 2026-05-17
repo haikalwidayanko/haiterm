@@ -240,25 +240,24 @@ def _render_trade_card(t):
     # Manual close controls for OPEN trades
     if status == "OPEN":
         with st.expander(f"📝 Tutup Manual — {t['id']}", expanded=False):
-            with st.form(f"close_{t['id']}"):
-                rc1, rc2, rc3 = st.columns(3)
-                with rc1:
-                    result = st.selectbox("Hasil", ["WIN", "LOSS", "BE"], key=f"res_{t['id']}")
-                with rc2:
-                    exit_price = st.number_input("Harga Keluar", value=0.0, format="%.5f", key=f"exit_{t['id']}")
-                with rc3:
-                    pips = st.number_input("Pips +/-", value=0.0, step=0.1, key=f"pips_{t['id']}")
-                notes = st.text_input("Catatan (opsional)", key=f"notes_{t['id']}")
+            rc1, rc2, rc3 = st.columns(3)
+            with rc1:
+                result = st.selectbox("Hasil", ["WIN", "LOSS", "BE"], key=f"res_{t['id']}")
+            with rc2:
+                exit_price = st.number_input("Harga Keluar", value=0.0, format="%.5f", key=f"exit_{t['id']}")
+            with rc3:
+                pips = st.number_input("Pips +/-", value=0.0, step=0.1, key=f"pips_{t['id']}")
+            notes = st.text_input("Catatan (opsional)", key=f"notes_{t['id']}")
 
-                sc1, sc2 = st.columns(2)
-                with sc1:
-                    if st.form_submit_button("🏁 Selesaikan Trade", use_container_width=True):
-                        from journal import close_trade
-                        close_trade(t['id'], result, exit_price, pips, notes)
-                        st.toast(f"Trade {t['id']} ditutup dengan hasil {result}", icon="🏁")
-                        st.rerun()
-                with sc2:
-                    if st.form_submit_button("🗑️ Hapus", use_container_width=True):
-                        delete_trade(t["id"])
-                        st.toast(f"Trade {t['id']} dihapus", icon="🗑️")
-                        st.rerun()
+            sc1, sc2 = st.columns(2)
+            with sc1:
+                if st.button("🏁 Selesaikan Trade", key=f"btn_close_{t['id']}", use_container_width=True):
+                    from journal import close_trade
+                    close_trade(t['id'], result, exit_price, pips, notes)
+                    st.toast(f"Trade {t['id']} ditutup dengan hasil {result}", icon="🏁")
+                    st.rerun()
+            with sc2:
+                if st.button("🗑️ Hapus", key=f"btn_del_{t['id']}", use_container_width=True):
+                    delete_trade(t["id"])
+                    st.toast(f"Trade {t['id']} dihapus", icon="🗑️")
+                    st.rerun()
