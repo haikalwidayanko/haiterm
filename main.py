@@ -294,7 +294,7 @@ with st.sidebar:
     render_calendar_widget()
 
     st.divider()
-    if user_role == "admin":
+    if st.session_state.role == "admin":
         if st.button("📲 TEST TELEGRAM"):
             send_telegram_alert(f"⚛️ *Widayanko-Terminal v2.0*\nStatus: Connected\nTime: {datetime.now(tz_jkt).strftime('%H:%M:%S')} WIB")
             st.toast("Notifikasi dikirim!", icon="📲")
