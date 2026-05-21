@@ -4,7 +4,7 @@ from auth import (
     update_user, delete_user, change_password, init_db,
     create_session
 )
-from data_provider import get_forex_list, FOREX_PAIRS
+
 
 def render_login_page():
     init_db()  # Ensure db and admin exist
@@ -18,8 +18,8 @@ def render_login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
+            username = st.text_input("Username", key="login_uname", autocomplete="username")
+            password = st.text_input("Password", type="password", key="login_pass", autocomplete="current-password")
             submit = st.form_submit_button("LOGIN", use_container_width=True)
 
             if submit:
@@ -69,15 +69,14 @@ def render_admin_dashboard():
     st.markdown("<h2 style='font-family:Orbitron;color:#FFD700;'>Admin Dashboard</h2>", unsafe_allow_html=True)
     
     users = get_all_users()
-    all_pairs = get_forex_list()
 
     st.subheader("Manage Users")
     
     # Add new user
     with st.expander("➕ Add New User", expanded=False):
         with st.form("add_user_form"):
-            new_username = st.text_input("Username")
-            new_password = st.text_input("Password", type="password")
+            new_username = st.text_input("New Username", key="add_new_uname")
+            new_password = st.text_input("New Password", type="password", key="add_new_pass", autocomplete="new-password")
             new_role = st.selectbox("Role", ["contributor", "admin"])
             
             # Select market access

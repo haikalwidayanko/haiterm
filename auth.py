@@ -2,7 +2,6 @@ import json
 import os
 import hashlib
 import uuid
-import streamlit as st
 
 from db_client import get_supabase_client
 
@@ -24,7 +23,7 @@ def _load_db() -> dict:
                     "role": row["role"],
                     "market_access": row["market_access"],
                     "can_access_journal": row["can_access_journal"],
-                    "telegram_chat_id": row.get("telegram_chat_id", "")
+                    "telegram_chat_id": row.get("telegram_chat_id") or ""
                 }
             return db
         except Exception as e:

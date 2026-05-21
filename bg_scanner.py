@@ -84,6 +84,10 @@ def run_background_scan(username):
             pair_name = FOREX_PAIRS.get(ticker, {}).get("name", ticker)
             candle_key = str(df.index[-1])
 
+            prev_close = float(df.iloc[-2]['Close']) if len(df) > 1 else last_close
+            price_delta = last_close - prev_close
+            pct_delta = (price_delta / prev_close) * 100 if prev_close else 0
+
             sig_entry = {
                 "ticker": ticker,
                 "pair_name": pair_name,
@@ -92,6 +96,8 @@ def run_background_scan(username):
                 "q_score": score_res.get("total", 0),
                 "pa_signal": ai.get("pa_signal", "NONE"),
                 "price": last_close,
+                "price_delta": price_delta,
+                "pct_delta": pct_delta,
                 "color": ai.get("color", "#888"),
             }
 

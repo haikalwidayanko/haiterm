@@ -180,6 +180,10 @@ with st.sidebar:
         </script>
     """, height=85)
 
+    from data_provider import get_market_sessions
+    _, _, m_note, m_color = get_market_sessions()
+    st.markdown(f"<div style='text-align:center; margin-top:-10px; margin-bottom:15px;'><span style='font-size:10px; color:#aaa; letter-spacing:1px;'>OPEN MARKET:</span><br><b style='color:{m_color}; font-family:Orbitron; font-size:12px; letter-spacing:2px;'>{m_note}</b><br><span style='font-size:9px; color:#555;'>*Crypto Market 24/7 Never Die</span></div>", unsafe_allow_html=True)
+
     st.divider()
 
     # User Permissions
@@ -334,39 +338,62 @@ def _render_heatmap():
     sig_map = {s["ticker"]: s for s in bg_sigs} if bg_sigs else {}
 
     cells_html = ""
-    for ticker in user_pairs:
-        name = FOREX_PAIRS.get(ticker, {}).get("name", ticker.replace("=X", "").replace("=F", ""))
-        short = name.split(" ")[0] if len(name) > 8 else name
-        sig = sig_map.get(ticker)
-        if sig:
-            q = sig.get("q_score", 0)
-        else:
-            q = 0  # No scan data yet
+    categories = [
+        ("FOREX", ["Forex", "Major", "Minor", "Exotic"]),
+        ("COMMODITIES", ["Metals", "Energy", "Agriculture", "Commodity"]),
+        ("CRYPTO", ["Crypto"])
+    ]
+    
+    for cat_name, cat_groups in categories:
+        cat_pairs = [t for t in user_pairs if FOREX_PAIRS.get(t, {}).get("group", "Forex") in cat_groups]
+        if not cat_pairs:
+            continue
+            
+        cells_html += f"""<div style="width:100%;margin-top:15px;margin-bottom:5px;font-family:'Orbitron';color:#888;font-size:10px;text-align:center;letter-spacing:2px;border-bottom:1px solid #222;padding-bottom:4px;">{cat_name}</div>"""
+        cells_html += '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%;">'
+        
+        for ticker in cat_pairs:
+            name = FOREX_PAIRS.get(ticker, {}).get("name", ticker.replace("=X", "").replace("=F", ""))
+            short = name.split(" ")[0] if len(name) > 8 else name
+            sig = sig_map.get(ticker)
+            
+            tt = f"{name}&#10;Data pending scan..."
+            q = 0
+            
+            if sig:
+                q = sig.get("q_score", 0)
+                price = sig.get("price", 0)
+                pct_delta = sig.get("pct_delta", 0)
+                
+                p_col = "+" if pct_delta >= 0 else ""
+                tt = f"{name}&#10;Harga: {price:,.5f} ({p_col}{pct_delta:.2f}%)"
+                
+            if q >= 6:
+                bg = "rgba(0,255,204,0.25)"
+                tc = "#00ffcc"
+            elif q >= 3:
+                bg = "rgba(0,255,204,0.10)"
+                tc = "#a3ffeb"
+            elif q <= -6:
+                bg = "rgba(255,75,75,0.25)"
+                tc = "#ff4b4b"
+            elif q <= -3:
+                bg = "rgba(255,75,75,0.10)"
+                tc = "#ff8585"
+            else:
+                bg = "rgba(255,255,255,0.03)"
+                tc = "#555"
 
-        if q >= 6:
-            bg = "rgba(0,255,204,0.25)"
-            tc = "#00ffcc"
-        elif q >= 3:
-            bg = "rgba(0,255,204,0.10)"
-            tc = "#a3ffeb"
-        elif q <= -6:
-            bg = "rgba(255,75,75,0.25)"
-            tc = "#ff4b4b"
-        elif q <= -3:
-            bg = "rgba(255,75,75,0.10)"
-            tc = "#ff8585"
-        else:
-            bg = "rgba(255,255,255,0.03)"
-            tc = "#555"
-
-        cells_html += f"""<div style="background:{bg};border:1px solid #222;border-radius:6px;
-                                      padding:8px 4px;text-align:center;min-width:70px;">
-            <span style="font-size:9px;color:{tc};font-family:'Orbitron';font-weight:700;">{short}</span><br>
-            <span style="font-size:14px;color:{tc};font-family:'JetBrains Mono';font-weight:900;">{q:+}</span>
-        </div>"""
+            cells_html += f"""<div title="{tt}" style="background:{bg};border:1px solid #222;border-radius:6px;
+                                          padding:8px 4px;text-align:center;min-width:70px;cursor:help;">
+                <span style="font-size:9px;color:{tc};font-family:'Orbitron';font-weight:700;">{short}</span><br>
+                <span style="font-size:14px;color:{tc};font-family:'JetBrains Mono';font-weight:900;">{q:+}</span>
+            </div>"""
+            
+        cells_html += '</div>'
 
     st.markdown(f"""
-        <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;">
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;width:100%;">
             {cells_html}
         </div>
     """, unsafe_allow_html=True)

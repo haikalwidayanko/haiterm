@@ -190,24 +190,35 @@ def sync_open_trades():
             if not sl or not entry_price:
                 continue
 
-            # Fetch 4h candles covering the trade period
-            df = fetch_forex_data(ticker, period="30d", interval="4h")
+            # Fetch 15m candles covering the trade period for better accuracy
+            df = fetch_forex_data(ticker, period="30d", interval="15m")
             if df is None or df.empty:
                 continue
 
             # Find candles after trade entry
-            entry_time = trade.get("opened_at_iso", "")
-            if entry_time:
-                try:
-                    from datetime import datetime as _dt
-                    et = _dt.fromisoformat(entry_time)
+            entry_time = trade.get("opened_at_iso") or trade.get("created_at")
+            et = None
+            try:
+                import pytz as _ptz
+                from datetime import datetime as _dt
+                if entry_time:
+                    et = _dt.fromisoformat(entry_time.replace('Z', '+00:00'))
                     if et.tzinfo is None:
-                        import pytz as _ptz
                         et = _ptz.timezone("Asia/Jakarta").localize(et)
-                    # Filter candles after entry
-                    df = df[df.index >= et]
-                except Exception:
-                    pass
+                elif trade.get("timestamp"):
+                    # Parse "YYYY-MM-DD HH:MM WIB"
+                    ts_str = trade.get("timestamp").replace(" WIB", "").strip()
+                    et = _dt.strptime(ts_str, "%Y-%m-%d %H:%M")
+                    et = _ptz.timezone("Asia/Jakarta").localize(et)
+            except Exception as e:
+                print(f"[JOURNAL SYNC] Error parsing time for {ticker}: {e}")
+                
+            if et:
+                # Filter candles after entry
+                df = df[df.index >= et]
+            else:
+                # If we cannot determine when the trade was opened, do not sync using past data.
+                continue
 
             if df.empty:
                 continue
@@ -246,12 +257,12 @@ def sync_open_trades():
                         _close_synced(trade, "WIN", tp2, pips, candle_date, "TP2_HIT")
                         synced += 1
                         break
-                    # TP1 hit: price went above TP1
-                    if tp1 > 0 and high >= tp1:
-                        pips = (tp1 - entry_price) * pip_mult
-                        _close_synced(trade, "WIN", tp1, pips, candle_date, "TP1_HIT")
-                        synced += 1
-                        break
+                    # TP1 hit: price went above TP1 (DISABLED BY USER REQUEST)
+                    # if tp1 > 0 and high >= tp1:
+                    #     pips = (tp1 - entry_price) * pip_mult
+                    #     _close_synced(trade, "WIN", tp1, pips, candle_date, "TP1_HIT")
+                    #     synced += 1
+                    #     break
 
                 else:  # SELL
                     # SL hit: price went above SL
@@ -266,12 +277,12 @@ def sync_open_trades():
                         _close_synced(trade, "WIN", tp2, pips, candle_date, "TP2_HIT")
                         synced += 1
                         break
-                    # TP1 hit: price went below TP1
-                    if tp1 > 0 and low <= tp1:
-                        pips = (entry_price - tp1) * pip_mult
-                        _close_synced(trade, "WIN", tp1, pips, candle_date, "TP1_HIT")
-                        synced += 1
-                        break
+                    # TP1 hit: price went below TP1 (DISABLED BY USER REQUEST)
+                    # if tp1 > 0 and low <= tp1:
+                    #     pips = (entry_price - tp1) * pip_mult
+                    #     _close_synced(trade, "WIN", tp1, pips, candle_date, "TP1_HIT")
+                    #     synced += 1
+                    #     break
 
         except Exception as e:
             print(f"[JOURNAL SYNC] Error syncing {trade.get('ticker')}: {e}")

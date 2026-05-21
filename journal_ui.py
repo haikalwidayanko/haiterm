@@ -242,13 +242,12 @@ def _render_trade_card(t):
         with st.expander(f"📝 Tutup Manual / Otomatis — {t['id']}", expanded=False):
             st.markdown("<p style='font-size:11px;color:#aaa;margin-bottom:8px;'>Tutup instant dengan harga pasar saat ini:</p>", unsafe_allow_html=True)
             if st.button("⚡ Tutup Otomatis (Harga Pasar)", key=f"btn_auto_{t['id']}", use_container_width=True):
-                import yfinance as yf
+                from data_provider import fetch_forex_data
                 from journal import close_trade
                 
                 with st.spinner("Mengambil harga pasar..."):
-                    ticker_obj = yf.Ticker(t["ticker"])
-                    hist = ticker_obj.history(period="1d", interval="1m")
-                    if not hist.empty:
+                    hist = fetch_forex_data(t["ticker"], period="1d", interval="1m")
+                    if hist is not None and not hist.empty:
                         curr_price = float(hist["Close"].iloc[-1])
                         
                         # Calculate pips
