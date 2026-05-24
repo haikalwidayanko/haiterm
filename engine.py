@@ -186,8 +186,9 @@ def get_detailed_scores_v12(df, macro, sentiment_score, fib_data, htf_bias=0, se
     elif mh < 0 and mh >= mh_p: m -= 1; m_n.append("MACD Hist Rising (Bearish)")
     # Williams %R (+/-2)
     wr = last['Williams_R']
-    if   wr > -20:  m += 2; m_n.append(f"Williams %R Overbought ({wr:.1f}) → Bullish")
-    elif wr < -80:  m -= 2; m_n.append(f"Williams %R Oversold ({wr:.1f}) → Bearish")
+    # Williams %R: > -20 = Overbought (reversal DOWN), < -80 = Oversold (reversal UP)
+    if   wr > -20:  m -= 1; m_n.append(f"Williams %R Overbought ({wr:.1f}) → Reversal Risk ↓")
+    elif wr < -80:  m += 1; m_n.append(f"Williams %R Oversold ({wr:.1f}) → Reversal Bounce ↑")
     elif wr > -50:  m += 1; m_n.append(f"Williams %R Bullish Zone ({wr:.1f})")
     else:           m -= 1; m_n.append(f"Williams %R Bearish Zone ({wr:.1f})")
     audit['Momentum'] = " | ".join(m_n)
@@ -196,10 +197,12 @@ def get_detailed_scores_v12(df, macro, sentiment_score, fib_data, htf_bias=0, se
     bb = 0; bb_n = []
     pctb = last['BB_PctB']; width = last['BB_Width']
     avg_width = df['BB_Width'].tail(20).mean() if len(df) > 20 else width
-    if   pctb > 1.0:  bb -= 1; bb_n.append("Price above BB Upper (Overbought)")
-    elif pctb < 0.0:  bb += 1; bb_n.append("Price below BB Lower (Oversold)")
-    elif pctb > 0.8:  bb += 1; bb_n.append(f"BB Upper Ride (%B={pctb:.2f})")
-    elif pctb < 0.2:  bb -= 1; bb_n.append(f"BB Lower Ride (%B={pctb:.2f})")
+    # BB: Above upper = overbought (bearish reversal), Below lower = oversold (bullish reversal)
+    # But RIDING the band = trend continuation
+    if   pctb > 1.0:  bb -= 1; bb_n.append("Price above BB Upper (Overbought → Reversal Risk)")
+    elif pctb < 0.0:  bb += 1; bb_n.append("Price below BB Lower (Oversold → Bounce Potential)")
+    elif pctb > 0.8:  bb += 1; bb_n.append(f"BB Upper Ride — Bullish Trend (%B={pctb:.2f})")
+    elif pctb < 0.2:  bb -= 1; bb_n.append(f"BB Lower Ride — Bearish Trend (%B={pctb:.2f})")
     else:             bb_n.append(f"BB Mid Zone (%B={pctb:.2f})")
     if width < avg_width * 0.7: bb_n.append("⚡ Bollinger Squeeze (Breakout Incoming)")
     elif width > avg_width * 1.5: bb_n.append("Bollinger Expansion (High Volatility)")
@@ -235,9 +238,19 @@ def get_detailed_scores_v12(df, macro, sentiment_score, fib_data, htf_bias=0, se
     else: audit['MTF'] = "Timeframes Divergent (No Bonus)"
 
     # ── 8. MACRO DXY CORRELATION (±2) ────────────────────────
+    # DXY direction matters more than absolute level
     dxy = macro.get('dxy_val', 0)
-    macro_s = (2 if dxy < 100 else -2) if dxy > 0 else 0
-    audit['Macro'] = f"DXY {dxy:.2f} ({'Weak → Risk-On' if dxy < 100 else 'Strong → Risk-Off'})" if dxy > 0 else "DXY Unavailable"
+    dxy_rising = macro.get('dxy_rel', False)  # True = DXY rose vs previous day
+    if dxy > 0:
+        if dxy_rising:
+            macro_s = -1  # Rising DXY = bearish for risk assets / non-USD
+            audit['Macro'] = f"DXY {dxy:.2f} ↑ Rising → USD Strength (Risk-Off)"
+        else:
+            macro_s = 1   # Falling DXY = bullish for risk assets / non-USD
+            audit['Macro'] = f"DXY {dxy:.2f} ↓ Falling → USD Weakness (Risk-On)"
+    else:
+        macro_s = 0
+        audit['Macro'] = "DXY Unavailable"
 
     # ── 9. SENTIMENT NARRATIVE (±2) ──────────────────────────
     audit['Sentiment'] = (f"Bullish: {sent_reason}" if sentiment_score > 0 else

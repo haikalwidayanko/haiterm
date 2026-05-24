@@ -35,11 +35,34 @@ def log_signal(ticker, pair_name, decision, confidence, q_score, pa_signal, plan
     """Log a new EXECUTE signal to the trade journal (status=PENDING until user decides)."""
     journal = _load_journal()
 
-    # Prevent duplicate logging for same ticker+candle
-    for t in journal[:10]:
-        if t.get("ticker") == ticker and t.get("entry_price") == plan.get("entry", price):
-            if t.get("status") in ("PENDING", "OPEN", "SKIPPED"):
-                return t["id"]
+    # Prevent duplicate logging for same ticker within a time window
+    now = datetime.now(tz_jkt)
+    for t in journal[:20]:
+        if t.get("ticker") != ticker:
+            continue
+        if t.get("status") not in ("PENDING", "OPEN", "SKIPPED"):
+            continue
+        # Same ticker still active → check if it's a duplicate
+        # 1) Exact same entry price = definitely duplicate
+        if t.get("entry_price") == plan.get("entry", price):
+            return t["id"]
+        # 2) Same direction + similar price within 0.5% = likely duplicate
+        same_dir = t.get("direction") == ("BUY" if "BUY" in decision else "SELL")
+        old_price = t.get("entry_price", 0)
+        new_price = plan.get("entry", price)
+        price_diff = abs(new_price - old_price) / (old_price or 1)
+        if same_dir and price_diff < 0.005:  # 0.5% tolerance
+            return t["id"]
+        # 3) Same ticker opened within 4 hours = too soon for new signal
+        try:
+            ts_str = t.get("timestamp", "").replace(" WIB", "").strip()
+            if ts_str:
+                old_time = datetime.strptime(ts_str, "%Y-%m-%d %H:%M")
+                old_time = tz_jkt.localize(old_time)
+                if (now - old_time).total_seconds() < 4 * 3600:  # 4 hours
+                    return t["id"]
+        except Exception:
+            pass
 
     entry = {
         "id": str(uuid.uuid4())[:8],
@@ -196,20 +219,28 @@ def sync_open_trades():
                 continue
 
             # Find candles after trade entry
-            entry_time = trade.get("opened_at_iso") or trade.get("created_at")
+            # Priority: timestamp (always Jakarta, always present) > opened_at_iso > created_at
             et = None
             try:
                 import pytz as _ptz
                 from datetime import datetime as _dt
-                if entry_time:
-                    et = _dt.fromisoformat(entry_time.replace('Z', '+00:00'))
-                    if et.tzinfo is None:
-                        et = _ptz.timezone("Asia/Jakarta").localize(et)
-                elif trade.get("timestamp"):
-                    # Parse "YYYY-MM-DD HH:MM WIB"
-                    ts_str = trade.get("timestamp").replace(" WIB", "").strip()
+
+                if trade.get("timestamp"):
+                    # Most reliable: explicitly set as Jakarta time "YYYY-MM-DD HH:MM WIB"
+                    ts_str = trade["timestamp"].replace(" WIB", "").strip()
                     et = _dt.strptime(ts_str, "%Y-%m-%d %H:%M")
                     et = _ptz.timezone("Asia/Jakarta").localize(et)
+                elif trade.get("opened_at_iso"):
+                    # Local JSON only, already has Jakarta timezone
+                    et = _dt.fromisoformat(trade["opened_at_iso"])
+                    if et.tzinfo is None:
+                        et = _ptz.timezone("Asia/Jakarta").localize(et)
+                elif trade.get("created_at"):
+                    # Supabase auto-generated — always treat as UTC
+                    ct = trade["created_at"]
+                    et = _dt.fromisoformat(ct.replace('Z', '+00:00'))
+                    if et.tzinfo is None:
+                        et = _ptz.utc.localize(et)  # UTC, NOT Jakarta!
             except Exception as e:
                 print(f"[JOURNAL SYNC] Error parsing time for {ticker}: {e}")
                 
@@ -237,6 +268,12 @@ def sync_open_trades():
             else:
                 pip_mult = 10000
 
+            # Spread buffer: crypto has wider spreads, avoid false SL hits from wicks
+            if is_crypto:
+                buffer = entry_price * 0.0005  # 0.05% buffer
+            else:
+                buffer = 0
+
             # Walk through each candle
             for idx, row in df.iterrows():
                 high = float(row["High"])
@@ -245,19 +282,26 @@ def sync_open_trades():
                 candle_date = idx.strftime("%Y-%m-%d %H:%M")
 
                 if direction == "BUY":
-                    # SL hit: price went below SL
-                    if sl > 0 and low <= sl:
-                        pips = (sl - entry_price) * pip_mult
-                        _close_synced(trade, "LOSS", sl, pips, candle_date, "SL_HIT")
-                        synced += 1
-                        break
-                    # TP2 hit: price went above TP2
-                    if tp2 > 0 and high >= tp2:
+                    sl_hit = sl > 0 and low <= (sl - buffer)
+                    tp_hit = tp2 > 0 and high >= tp2
+
+                    # Ambiguous candle: both SL and TP touched — skip, can't determine order
+                    if sl_hit and tp_hit:
+                        continue
+
+                    # Check TP first (benefit of the doubt)
+                    if tp_hit:
                         pips = (tp2 - entry_price) * pip_mult
                         _close_synced(trade, "WIN", tp2, pips, candle_date, "TP2_HIT")
                         synced += 1
                         break
-                    # TP1 hit: price went above TP1 (DISABLED BY USER REQUEST)
+                    # Then check SL
+                    if sl_hit:
+                        pips = (sl - entry_price) * pip_mult
+                        _close_synced(trade, "LOSS", sl, pips, candle_date, "SL_HIT")
+                        synced += 1
+                        break
+                    # TP1 hit (DISABLED BY USER REQUEST)
                     # if tp1 > 0 and high >= tp1:
                     #     pips = (tp1 - entry_price) * pip_mult
                     #     _close_synced(trade, "WIN", tp1, pips, candle_date, "TP1_HIT")
@@ -265,19 +309,26 @@ def sync_open_trades():
                     #     break
 
                 else:  # SELL
-                    # SL hit: price went above SL
-                    if sl > 0 and high >= sl:
-                        pips = (entry_price - sl) * pip_mult
-                        _close_synced(trade, "LOSS", sl, pips, candle_date, "SL_HIT")
-                        synced += 1
-                        break
-                    # TP2 hit: price went below TP2
-                    if tp2 > 0 and low <= tp2:
+                    sl_hit = sl > 0 and high >= (sl + buffer)
+                    tp_hit = tp2 > 0 and low <= tp2
+
+                    # Ambiguous candle: both SL and TP touched — skip
+                    if sl_hit and tp_hit:
+                        continue
+
+                    # Check TP first (benefit of the doubt)
+                    if tp_hit:
                         pips = (entry_price - tp2) * pip_mult
                         _close_synced(trade, "WIN", tp2, pips, candle_date, "TP2_HIT")
                         synced += 1
                         break
-                    # TP1 hit: price went below TP1 (DISABLED BY USER REQUEST)
+                    # Then check SL
+                    if sl_hit:
+                        pips = (entry_price - sl) * pip_mult
+                        _close_synced(trade, "LOSS", sl, pips, candle_date, "SL_HIT")
+                        synced += 1
+                        break
+                    # TP1 hit (DISABLED BY USER REQUEST)
                     # if tp1 > 0 and low <= tp1:
                     #     pips = (entry_price - tp1) * pip_mult
                     #     _close_synced(trade, "WIN", tp1, pips, candle_date, "TP1_HIT")
