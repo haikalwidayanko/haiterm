@@ -22,6 +22,7 @@ from auth_ui import render_login_page, render_profile_page, render_admin_dashboa
 from auth import has_pair_access, get_session_user, destroy_session, get_user_role, get_user_config
 from journal_ui import render_journal_page
 from journal import log_signal
+from auto_trader_ui import render_auto_trader_page
 from bg_scanner import run_background_scan, get_last_scan_results, get_all_scan_results
 from calendar_ui import render_calendar_widget, render_calendar_full
 
@@ -217,7 +218,7 @@ with st.sidebar:
 
     # Navigation for Detail View
     is_detail = st.session_state.app_view == "detail"
-    if is_detail or st.session_state.app_view in ["admin", "profile", "journal", "calendar"]:
+    if is_detail or st.session_state.app_view in ["admin", "profile", "journal", "calendar", "auto_trader"]:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔙 BACK TO SCANNER", use_container_width=True):
             st.session_state.app_view = "scanner"
@@ -242,6 +243,12 @@ with st.sidebar:
     if can_journal:
         if st.button("📓 TRADE JOURNAL", use_container_width=True):
             st.session_state.app_view = "journal"
+            st.session_state.active_ticker = None
+            st.rerun()
+
+    if st.session_state.role == "admin":
+        if st.button("🤖 AUTO TRADER", use_container_width=True):
+            st.session_state.app_view = "auto_trader"
             st.session_state.active_ticker = None
             st.rerun()
 
@@ -292,6 +299,28 @@ with st.sidebar:
         st.session_state.bg_last_run = True
         run_background_scan(st.session_state.username)
 
+        # ── AUTO TRADER: sync + scan otomatis (admin only) ──
+        # Jalan setiap kali bg_scan_refresh trigger (tiap jam)
+        # Tidak perlu buka menu Auto Trader
+        if st.session_state.get("role") == "admin":
+            try:
+                from auto_trader import get_profiles, sync_sim_trades, run_auto_scan
+                _at_profiles = get_profiles(st.session_state.username)
+                _at_synced = 0
+                _at_new_orders = 0
+                for _p in _at_profiles:
+                    if _p.get("is_active"):
+                        _at_synced += sync_sim_trades(_p["id"])
+                        _res = run_auto_scan(_p)
+                        _at_new_orders += _res.get("new_orders", 0)
+                if _at_synced > 0 or _at_new_orders > 0:
+                    st.toast(
+                        f"🤖 Auto Trader: {_at_new_orders} order baru | {_at_synced} trade auto-closed",
+                        icon="⚡"
+                    )
+            except Exception as _e:
+                print(f"[AUTO TRADER BG] Error: {_e}")
+
     st.divider()
 
     # Economic Calendar widget in sidebar
@@ -317,6 +346,10 @@ if st.session_state.app_view == "admin":
 
 if st.session_state.app_view == "journal":
     render_journal_page()
+    st.stop()
+
+if st.session_state.app_view == "auto_trader":
+    render_auto_trader_page()
     st.stop()
 
 if st.session_state.app_view == "calendar":
