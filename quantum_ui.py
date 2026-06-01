@@ -9,9 +9,9 @@ def render_quantum_tab(ticker, df, score_res, macro, sd, *args):
     last    = df.iloc[-1]
 
     # Color scheme
-    if   total >= 8:  color = "#00ffcc"; label = "STRONG BULLISH SIGNAL"; glow = "0 0 40px #00ffcc44"
+    if   total >= 6:  color = "#00ffcc"; label = "STRONG BULLISH SIGNAL"; glow = "0 0 40px #00ffcc44"
     elif total >= 5:  color = "#a3ffeb"; label = "BULLISH BIAS"; glow = "0 0 20px #a3ffeb33"
-    elif total <= -8: color = "#ff4b4b"; label = "STRONG BEARISH SIGNAL"; glow = "0 0 40px #ff4b4b44"
+    elif total <= -6: color = "#ff4b4b"; label = "STRONG BEARISH SIGNAL"; glow = "0 0 40px #ff4b4b44"
     elif total <= -5: color = "#ff8585"; label = "BEARISH BIAS"; glow = "0 0 20px #ff858533"
     else:             color = "#888888"; label = "NEUTRAL / MONITORING"; glow = "none"
 

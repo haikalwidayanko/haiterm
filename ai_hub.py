@@ -1,4 +1,4 @@
-def generate_ai_judgment(quantum_res, fib_data, smc_zones, p_now, atr=None):
+def generate_ai_judgment(quantum_res, fib_data, smc_zones, p_now, atr=None, ticker=""):
     """
     AI Final Decision Engine V3 — Multi-layer confluence analysis.
     Outputs: EXECUTE BUY / EXECUTE SELL / STANDBY / DANGER ZONE
@@ -104,7 +104,7 @@ def generate_ai_judgment(quantum_res, fib_data, smc_zones, p_now, atr=None):
         action   = "Sinyal Buy terkonfirmasi oleh Candlestick/Sweep PA. Momentum Valid. Eksekusi sekarang."
         entry    = p_now
         sl_raw   = deep if (deep > 0 and deep < entry) else (low_0 if low_0 < entry else entry * 0.995)
-        plan     = _build_plan_buy(entry, sl_raw, tp1_ext, tp2_ext, high_100, atr, p_now)
+        plan     = _build_plan_buy(entry, sl_raw, tp1_ext, tp2_ext, high_100, atr, p_now, ticker)
 
     elif q >= 5:
         decision = "BULLISH BIAS"
@@ -115,7 +115,7 @@ def generate_ai_judgment(quantum_res, fib_data, smc_zones, p_now, atr=None):
             action = "Kondisi bullish namun skor Quantum masih rendah. Entry kecil."
         entry    = golden if golden > 0 else p_now
         sl_raw   = low_0 if low_0 < entry else entry * 0.995
-        plan     = _build_plan_buy(entry, sl_raw, tp1_ext, tp2_ext, high_100, atr, p_now)
+        plan     = _build_plan_buy(entry, sl_raw, tp1_ext, tp2_ext, high_100, atr, p_now, ticker)
 
     elif q <= -6 and conf >= 60 and pa_s < 0:
         decision = "EXECUTE SELL"
@@ -123,7 +123,9 @@ def generate_ai_judgment(quantum_res, fib_data, smc_zones, p_now, atr=None):
         action   = "Sinyal Sell terkonfirmasi oleh Candlestick/Sweep PA. Momentum Valid. Eksekusi sekarang."
         entry    = p_now
         sl_raw   = high_100 if high_100 > entry else entry * 1.005
-        plan     = _build_plan_sell(entry, sl_raw, tp1_ext, tp2_ext, low_0, atr, p_now)
+        down1_ext = fib_data.get('-27.2% (Down1)', 0)
+        down2_ext = fib_data.get('-61.8% (Down2)', 0)
+        plan     = _build_plan_sell(entry, sl_raw, down1_ext, down2_ext, low_0, atr, p_now, ticker)
 
     elif q <= -5:
         decision = "BEARISH BIAS"
@@ -134,7 +136,9 @@ def generate_ai_judgment(quantum_res, fib_data, smc_zones, p_now, atr=None):
             action = "Kondisi bearish namun skor Quantum masih rendah. Short kecil."
         entry    = golden if golden > 0 else p_now
         sl_raw   = high_100 if high_100 > entry else entry * 1.005
-        plan     = _build_plan_sell(entry, sl_raw, tp1_ext, tp2_ext, low_0, atr, p_now)
+        down1_ext = fib_data.get('-27.2% (Down1)', 0)
+        down2_ext = fib_data.get('-61.8% (Down2)', 0)
+        plan     = _build_plan_sell(entry, sl_raw, down1_ext, down2_ext, low_0, atr, p_now, ticker)
 
     else:
         decision = "STANDBY"
@@ -165,22 +169,25 @@ def generate_ai_judgment(quantum_res, fib_data, smc_zones, p_now, atr=None):
 
 # ── PLAN BUILDERS ────────────────────────────────────────────────────────────
 
-def _pip_value(price_a, price_b, entry):
-    """Convert price diff to pip-equivalent value (5-decimal = 0.0001 pip unit)."""
+def _pip_value(price_a, price_b, ticker=""):
+    """Convert price diff to pip-equivalent value matching auto_trader."""
     diff = abs(price_a - price_b)
-    if entry > 100:      # JPY pairs, indices
+    
+    is_jpy    = "JPY" in ticker
+    is_crypto = "-USD" in ticker
+    is_commo  = ticker.endswith("=F")
+    
+    if is_crypto:
+        return round(diff * 1, 2)
+    elif is_jpy:
         return round(diff * 100, 1)
-    elif entry < 0.01:   # crypto < 1 cent (SHIB)
-        return round(diff * 1_000_000, 1)
-    elif entry < 1:      # crypto mid (sub-1 USD)
-        return round(diff * 10_000, 1)
-    elif entry > 1000:   # BTC, high-price crypto / gold
-        return round(diff, 2)
-    else:                # standard forex 0.xxxxx
-        return round(diff * 10_000, 1)
+    elif is_commo:
+        return round(diff * 1, 2)
+    else:
+        return round(diff * 10000, 1)
 
 
-def _build_plan_buy(entry, sl_raw, tp1_ext, tp2_ext, high_100, atr, p_now):
+def _build_plan_buy(entry, sl_raw, tp1_ext, tp2_ext, high_100, atr, p_now, ticker=""):
     """
     Build BUY trade plan. SL = below entry. TPs at 1:1, 2:1, 3:1, 5:1 R:R minimum.
     ATR used to ensure SL is not too tight. Minimum 3:1 on TP3.
@@ -209,10 +216,10 @@ def _build_plan_buy(entry, sl_raw, tp1_ext, tp2_ext, high_100, atr, p_now):
     if high_100 > tp2 and high_100 < tp3:
         tp3 = max(tp3, high_100 + risk * 0.5)
 
-    return _pack_plan(entry, sl_raw, tp1, tp2, tp3, tp4, direction="BUY", p_now=p_now)
+    return _pack_plan(entry, sl_raw, tp1, tp2, tp3, tp4, direction="BUY", p_now=p_now, ticker=ticker)
 
 
-def _build_plan_sell(entry, sl_raw, tp1_ext, tp2_ext, low_0, atr, p_now):
+def _build_plan_sell(entry, sl_raw, tp1_ext, tp2_ext, low_0, atr, p_now, ticker=""):
     """
     Build SELL trade plan. SL = above entry. TPs at 1:1, 2:1, 3:1, 5:1 R:R minimum.
     """
@@ -232,14 +239,14 @@ def _build_plan_sell(entry, sl_raw, tp1_ext, tp2_ext, low_0, atr, p_now):
     tp4 = entry - risk * 5.0   # 5:1
 
     # Upgrade with fib extension if further down
-    if low_0 > 0 and low_0 < tp3:
-        tp3 = low_0
-        tp4 = min(tp4, low_0 - risk * 2)
+    if tp1_ext > 0 and tp1_ext < tp3:
+        tp3 = tp1_ext
+        tp4 = min(tp4, tp2_ext) if tp2_ext > 0 and tp2_ext < tp3 else tp3 - risk * 2
 
-    return _pack_plan(entry, sl_raw, tp1, tp2, tp3, tp4, direction="SELL", p_now=p_now)
+    return _pack_plan(entry, sl_raw, tp1, tp2, tp3, tp4, direction="SELL", p_now=p_now, ticker=ticker)
 
 
-def _pack_plan(entry, sl, tp1, tp2, tp3, tp4, direction="BUY", p_now=0):
+def _pack_plan(entry, sl, tp1, tp2, tp3, tp4, direction="BUY", p_now=0, ticker=""):
     """Pack plan dict with pip distances and R:R ratios."""
     risk = abs(entry - sl)
     if risk == 0:
@@ -262,7 +269,7 @@ def _pack_plan(entry, sl, tp1, tp2, tp3, tp4, direction="BUY", p_now=0):
         else: status = "WAITING (Belum Masuk)"
 
     def rr(tp): return round(abs(tp - entry) / risk, 1)
-    def pips(a, b): return _pip_value(a, b, entry)
+    def pips(a, b): return _pip_value(a, b, ticker)
 
     return {
         "direction": direction,

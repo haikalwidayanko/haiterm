@@ -347,7 +347,7 @@ def _close_sim_trade(trade: dict, result: str, exit_price: float, pips: float, r
         pnl_usd = pips * pip_val
     elif is_jpy:
         pip_val = PIP_VALUE_PER_LOT["JPY"] * lot_size
-        pnl_usd = pips * pip_val / 100
+        pnl_usd = pips * pip_val
     elif is_commo:
         pip_val = PIP_VALUE_PER_LOT["COMMO"] * lot_size
         pnl_usd = pips * pip_val
@@ -492,7 +492,7 @@ def run_auto_scan(profile: dict) -> dict:
             last_close = float(df.iloc[-1]["Close"])
             atr        = float(df.iloc[-1].get("ATR", last_close * 0.005))
 
-            ai_data = generate_ai_judgment(score_res, fib, smc_zones, last_close, atr=atr)
+            ai_data = generate_ai_judgment(score_res, fib, smc_zones, last_close, atr=atr, ticker=ticker)
             decision = ai_data.get("decision", "STANDBY")
 
             if decision not in ("EXECUTE BUY", "EXECUTE SELL"):
@@ -586,6 +586,12 @@ def sync_sim_trades(profile_id: str) -> int:
                     et = datetime.fromisoformat(opened_at_str)
                     if et.tzinfo is None:
                         et = tz_jkt.localize(et)
+                    
+                    if df.index.tzinfo is not None:
+                        et = et.astimezone(df.index.tzinfo)
+                    else:
+                        et = et.replace(tzinfo=None)
+                        
                     df = df[df.index >= et]
                 except Exception:
                     pass

@@ -35,7 +35,7 @@ try:
     last_atr  = float(df.iloc[-1].get('ATR', 0)) if 'ATR' in df.columns else None
     
     print("Calling generate_ai_judgment...")
-    ai_data   = generate_ai_judgment(score_res, fib_levels, smc_zones, last_close, atr=last_atr)
+    ai_data   = generate_ai_judgment(score_res, fib_levels, smc_zones, last_close, atr=last_atr, ticker=active_ticker)
     
     print("Testing render_forex_scanner...")
     import streamlit as st

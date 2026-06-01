@@ -78,7 +78,7 @@ def run_background_scan(username):
             smc_zones = deteksi_smc_v2(df)
             last_close = float(df.iloc[-1]['Close'])
             last_atr = float(df.iloc[-1].get('ATR', 0)) if 'ATR' in df.columns else None
-            ai = generate_ai_judgment(score_res, fib, smc_zones, last_close, atr=last_atr)
+            ai = generate_ai_judgment(score_res, fib, smc_zones, last_close, atr=last_atr, ticker=ticker)
 
             decision = ai.get("decision", "STANDBY")
             pair_name = FOREX_PAIRS.get(ticker, {}).get("name", ticker)

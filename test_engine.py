@@ -17,7 +17,7 @@ try:
 
     from ai_hub import generate_ai_judgment
     print("Testing generate_ai_judgment...")
-    ai_res = generate_ai_judgment(res, {}, [], float(df['Close'].iloc[-1]), atr=0.005)
+    ai_res = generate_ai_judgment(res, {}, [], float(df['Close'].iloc[-1]), atr=0.005, ticker="EURUSD=X")
     print("AI Decision:", ai_res['decision'])
 
     print("Testing run_backtest...")

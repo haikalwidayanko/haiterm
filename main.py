@@ -599,10 +599,10 @@ try:
     df_htf     = hitung_indikator_lengkap(df_htf_raw)
     htf_bias   = 1 if df_htf.iloc[-1]['Close'] > df_htf.iloc[-1]['EMA50'] else -1
 
-    score_res = get_detailed_scores_v12(df, macro, si, fib_levels, htf_bias, sent_exp)
+    score_res = get_detailed_scores_v12(df, macro, si, fib_levels, htf_bias, sent_exp, ticker=active_ticker)
     smc_zones = deteksi_smc_v2(df)
     last_atr  = float(df.iloc[-1].get('ATR', 0)) if 'ATR' in df.columns else None
-    ai_data   = generate_ai_judgment(score_res, fib_levels, smc_zones, last_close, atr=last_atr)
+    ai_data   = generate_ai_judgment(score_res, fib_levels, smc_zones, last_close, atr=last_atr, ticker=active_ticker)
     sessions, _, m_note, m_color = get_market_sessions()
 
     # Crypto markets are 24/7 — override session info

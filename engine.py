@@ -124,6 +124,8 @@ def calculate_fibonacci_levels(df):
         '100% (High)':     high,
         '127.2% (T1)':     high + diff * 0.272,
         '161.8% (T2)':     high + diff * 0.618,
+        '-27.2% (Down1)':  low - diff * 0.272,
+        '-61.8% (Down2)':  low - diff * 0.618,
     }
 
 
@@ -131,7 +133,7 @@ def calculate_fibonacci_levels(df):
 # QUANTUM SCORING ENGINE V12
 # ============================================================
 
-def get_detailed_scores_v12(df, macro, sentiment_score, fib_data, htf_bias=0, sent_reason=""):
+def get_detailed_scores_v12(df, macro, sentiment_score, fib_data, htf_bias=0, sent_reason="", ticker=""):
     """
     Quantum Engine V12 — 9-dimension confluence scoring.
     Indicators: EMA, StochRSI, MACD, Bollinger, Ichimoku, VWAP, Williams %R, ADX, ATR, Fibonacci, Macro
@@ -238,16 +240,37 @@ def get_detailed_scores_v12(df, macro, sentiment_score, fib_data, htf_bias=0, se
     else: audit['MTF'] = "Timeframes Divergent (No Bonus)"
 
     # ── 8. MACRO DXY CORRELATION (±2) ────────────────────────
-    # DXY direction matters more than absolute level
+    # DXY direction matters more than absolute level.
+    # IMPORTANT: For USD-BASE pairs (USDCHF, USDJPY, USDCAD), the correlation
+    # is INVERTED vs USD-QUOTE pairs (EURUSD, GBPUSD, etc.).
+    # Rising DXY → USD strengthens → USD/XXX goes UP (Bullish), XXX/USD goes DOWN (Bearish)
+    USD_BASE_PAIRS = ("USDCHF", "USDJPY", "USDCAD", "USDSGD", "USDHKD", "USDMXN", "USDZAR")
+    _ticker_clean = ticker.replace("=X", "").replace("=F", "").upper()
+    _is_usd_base = any(_ticker_clean.startswith(p) for p in USD_BASE_PAIRS)
+
     dxy = macro.get('dxy_val', 0)
     dxy_rising = macro.get('dxy_rel', False)  # True = DXY rose vs previous day
     if dxy > 0:
         if dxy_rising:
-            macro_s = -1  # Rising DXY = bearish for risk assets / non-USD
-            audit['Macro'] = f"DXY {dxy:.2f} ↑ Rising → USD Strength (Risk-Off)"
+            # Rising DXY = USD Strength
+            # → Bearish for EUR/USD, GBP/USD, AUD/USD, NZD/USD (USD is quote)
+            # → Bullish for USD/CHF, USD/JPY, USD/CAD (USD is base)
+            if _is_usd_base:
+                macro_s = 1
+                audit['Macro'] = f"DXY {dxy:.2f} ↑ Rising → USD Strength → {_ticker_clean} Bullish ✓"
+            else:
+                macro_s = -1
+                audit['Macro'] = f"DXY {dxy:.2f} ↑ Rising → USD Strength (Risk-Off)"
         else:
-            macro_s = 1   # Falling DXY = bullish for risk assets / non-USD
-            audit['Macro'] = f"DXY {dxy:.2f} ↓ Falling → USD Weakness (Risk-On)"
+            # Falling DXY = USD Weakness
+            # → Bullish for EUR/USD, GBP/USD, etc.
+            # → Bearish for USD/CHF, USD/JPY, USD/CAD
+            if _is_usd_base:
+                macro_s = -1
+                audit['Macro'] = f"DXY {dxy:.2f} ↓ Falling → USD Weakness → {_ticker_clean} Bearish ✗"
+            else:
+                macro_s = 1
+                audit['Macro'] = f"DXY {dxy:.2f} ↓ Falling → USD Weakness (Risk-On)"
     else:
         macro_s = 0
         audit['Macro'] = "DXY Unavailable"
