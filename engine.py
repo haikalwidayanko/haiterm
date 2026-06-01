@@ -99,8 +99,12 @@ def _calc_ichimoku(df):
 def hitung_adx_manual(df, window=14):
     d = df.copy()
     d['TR']  = pd.concat([d['High'] - d['Low'], (d['High'] - d['Close'].shift()).abs(), (d['Low'] - d['Close'].shift()).abs()], axis=1).max(axis=1)
-    d['+DM'] = d['High'].diff().clip(lower=0)
-    d['-DM'] = d['Low'].diff().apply(lambda x: -x).clip(lower=0)
+    up_move   = d['High'].diff()
+    down_move = -d['Low'].diff()  # Low[prev] - Low[curr]
+    # +DM valid only when up_move > down_move AND up_move > 0
+    d['+DM'] = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    # -DM valid only when down_move > up_move AND down_move > 0
+    d['-DM'] = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
     tr_s  = d['TR'].rolling(window).mean() + 1e-9
     di_p  = 100 * (d['+DM'].rolling(window).mean() / tr_s)
     di_m  = 100 * (d['-DM'].rolling(window).mean() / tr_s)
@@ -233,10 +237,10 @@ def get_detailed_scores_v12(df, macro, sentiment_score, fib_data, htf_bias=0, se
         elif atr < atr_avg * 0.7: atr_s = -1; audit['Volatility'] = "ATR Squeeze (Fake Move Risk)"
         else: audit['Volatility'] = "ATR Normal Range"
 
-    # ── 7. MTF ALIGNMENT BONUS (+2) ──────────────────────────
+    # ── 7. MTF ALIGNMENT BONUS (±2) ──────────────────────────
     mtf = 0
-    if   htf_bias > 0 and (t + m) > 0: mtf = 2; audit['MTF'] = "HTF Bullish Aligned ✓ (+2 Bonus)"
-    elif htf_bias < 0 and (t + m) < 0: mtf = 2; audit['MTF'] = "HTF Bearish Aligned ✓ (+2 Bonus)"
+    if   htf_bias > 0 and (t + m) > 0: mtf = 2;  audit['MTF'] = "HTF Bullish Aligned ✓ (+2 Bonus)"
+    elif htf_bias < 0 and (t + m) < 0: mtf = -2; audit['MTF'] = "HTF Bearish Aligned ✓ (−2 Bonus)"
     else: audit['MTF'] = "Timeframes Divergent (No Bonus)"
 
     # ── 8. MACRO DXY CORRELATION (±2) ────────────────────────
@@ -364,6 +368,9 @@ def deteksi_price_action(df):
         score -= 4
         reason.append(f"Bearish Liquidity Sweep (SFP) at {swing_high:.5f}")
 
+    # Cap PA score to prevent over-accumulation (max ±4)
+    score = max(min(score, 4), -4)
+
     return {"signal": signal, "score": score, "reason": " | ".join(reason) if reason else "No PA Pattern"}
 
 
@@ -385,7 +392,7 @@ def deteksi_smc_v2(df):
 # BACKTESTING ENGINE
 # ============================================================
 
-def run_backtest(df):
+def run_backtest(df, ticker=""):
     """
     Simulates trades based on technical Quantum Score signals over the provided historical dataframe.
     Entry logic: Technical Score >= 4 (Buy), <= -4 (Sell)
@@ -393,7 +400,20 @@ def run_backtest(df):
     """
     if df is None or len(df) < 50:
         return {"total_trades": 0, "win_rate": 0, "pips_net": 0, "history": []}
-    
+
+    # Determine pip multiplier based on asset class
+    is_jpy    = "JPY" in ticker
+    is_crypto = "-USD" in ticker
+    is_commo  = ticker.endswith("=F")
+    if is_crypto:
+        pip_mult = 1
+    elif is_jpy:
+        pip_mult = 100
+    elif is_commo:
+        pip_mult = 1
+    else:
+        pip_mult = 10000
+
     trades = []
     in_trade = False
     entry_price = 0
@@ -414,17 +434,17 @@ def run_backtest(df):
             # Check exit conditions
             if direction == 1:
                 if l <= sl:
-                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "BUY", "result": "LOSS", "pips": (sl - entry_price)*10000})
+                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "BUY", "result": "LOSS", "pips": (sl - entry_price)*pip_mult})
                     in_trade = False
                 elif h >= tp:
-                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "BUY", "result": "WIN", "pips": (tp - entry_price)*10000})
+                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "BUY", "result": "WIN", "pips": (tp - entry_price)*pip_mult})
                     in_trade = False
             else:
                 if h >= sl:
-                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "SELL", "result": "LOSS", "pips": (entry_price - sl)*10000})
+                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "SELL", "result": "LOSS", "pips": (entry_price - sl)*pip_mult})
                     in_trade = False
                 elif l <= tp:
-                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "SELL", "result": "WIN", "pips": (entry_price - tp)*10000})
+                    trades.append({"entry_time": entry_time, "exit_time": curr_time, "type": "SELL", "result": "WIN", "pips": (entry_price - tp)*pip_mult})
                     in_trade = False
             continue
             

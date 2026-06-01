@@ -474,8 +474,10 @@ def run_auto_scan(profile: dict) -> dict:
 
             # HTF bias
             df_htf_raw = fetch_forex_data(ticker, "60d", "1d")
-            df_htf = hitung_indikator_lengkap(df_htf_raw)
-            htf_bias = 1 if df_htf.iloc[-1]["Close"] > df_htf.iloc[-1]["EMA50"] else -1
+            htf_bias = 0
+            if df_htf_raw is not None and not df_htf_raw.empty:
+                df_htf = hitung_indikator_lengkap(df_htf_raw)
+                htf_bias = 1 if df_htf.iloc[-1]["Close"] > df_htf.iloc[-1]["EMA50"] else -1
 
             score_res = get_detailed_scores_v12(df, macro, si, fib, htf_bias)
             q_total = score_res.get("total", 0)
@@ -623,7 +625,11 @@ def sync_sim_trades(profile_id: str) -> int:
                     tp_hit = tp2 > 0 and high >= tp2
 
                     if sl_hit and tp_hit:
-                        continue  # ambiguous candle, skip
+                        # Ambiguous candle: assume worst case (SL hit first)
+                        pips = (sl - entry) * pip_mult
+                        _close_sim_trade(trade, "LOSS", sl, pips, "SL_HIT")
+                        synced += 1
+                        break
                     if tp_hit:
                         pips = (tp2 - entry) * pip_mult
                         _close_sim_trade(trade, "WIN", tp2, pips, "TP2_HIT")
@@ -639,7 +645,11 @@ def sync_sim_trades(profile_id: str) -> int:
                     tp_hit = tp2 > 0 and low <= tp2
 
                     if sl_hit and tp_hit:
-                        continue
+                        # Ambiguous candle: assume worst case (SL hit first)
+                        pips = (entry - sl) * pip_mult
+                        _close_sim_trade(trade, "LOSS", sl, pips, "SL_HIT")
+                        synced += 1
+                        break
                     if tp_hit:
                         pips = (entry - tp2) * pip_mult
                         _close_sim_trade(trade, "WIN", tp2, pips, "TP2_HIT")
@@ -762,7 +772,8 @@ def manual_close_sim_trade(trade_id: str) -> bool:
 
             is_jpy    = "JPY" in ticker
             is_crypto = "-USD" in ticker
-            pip_mult  = 1 if is_crypto else (100 if is_jpy else 10000)
+            is_commo  = ticker.endswith("=F")
+            pip_mult  = 1 if is_crypto else (100 if is_jpy else (1 if is_commo else 10000))
 
             if direction == "BUY":
                 pips = (cur_price - entry) * pip_mult

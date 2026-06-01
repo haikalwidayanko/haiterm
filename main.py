@@ -293,15 +293,21 @@ with st.sidebar:
     if refresh_on:
         st_autorefresh(interval=300000, key="clock_refresh")
 
-    # Background scanner runs automatically every hour
+    # Background scanner + auto trader runs automatically every hour
     st_autorefresh(interval=3600000, key="bg_scan_refresh")
-    if "bg_last_run" not in st.session_state:
-        st.session_state.bg_last_run = True
+
+    # Check if enough time has passed since last run (55 min buffer)
+    _now_ts = datetime.now(tz_jkt)
+    _last_bg_run = st.session_state.get("bg_last_run_ts")
+    _should_run_bg = _last_bg_run is None or (_now_ts - _last_bg_run).total_seconds() >= 3300  # 55 min
+
+    if _should_run_bg:
+        st.session_state.bg_last_run_ts = _now_ts
         run_background_scan(st.session_state.username)
 
         # ── AUTO TRADER: sync + scan otomatis (admin only) ──
         # Jalan setiap kali bg_scan_refresh trigger (tiap jam)
-        # Tidak perlu buka menu Auto Trader
+        # Tidak perlu buka menu Auto Trader — aktif di semua halaman
         if st.session_state.get("role") == "admin":
             try:
                 from auto_trader import get_profiles, sync_sim_trades, run_auto_scan
@@ -747,7 +753,7 @@ try:
 
     with tab_bt:
         st.markdown("<br><p style='font-family:Orbitron;color:#aaa;font-size:14px;letter-spacing:2px;'>HISTORICAL STRATEGY VALIDATION</p>", unsafe_allow_html=True)
-        bt_res = run_backtest(df)
+        bt_res = run_backtest(df, ticker=active_ticker)
         if bt_res['total_trades'] == 0:
             st.info("Not enough historical volatility/signals found to run a valid backtest.")
         else:

@@ -95,8 +95,6 @@ def get_ticker_display_name(ticker):
 def get_ticker_group(ticker):
     if ticker in FOREX_PAIRS:
         return FOREX_PAIRS[ticker]['group']
-    if ticker in CRYPTO_PAIRS:
-        return "Crypto"
     return "Unknown"
 
 
@@ -281,7 +279,7 @@ def get_mtf_scores(ticker, macro, si):
                     df_htf = hitung_indikator_lengkap(df_htf)
                     htf_bias = 1 if df_htf.iloc[-1]['Close'] > df_htf.iloc[-1]['EMA50'] else -1
 
-                res = get_detailed_scores_v12(df_ind, macro, si, fib, htf_bias)
+                res = get_detailed_scores_v12(df_ind, macro, si, fib, htf_bias, ticker=ticker)
                 scores[tf] = res['total']
             else:
                 scores[tf] = 0

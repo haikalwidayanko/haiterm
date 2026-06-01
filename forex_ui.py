@@ -47,13 +47,13 @@ def render_forex_scanner(tf="1h", category="Forex"):
                 df_htf   = hitung_indikator_lengkap(df_htf)
                 htf_bias = 1 if df_htf.iloc[-1]['Close'] > df_htf.iloc[-1]['EMA50'] else -1
 
-            score_res  = get_detailed_scores_v12(df, macro, si, fib, htf_bias)
+            score_res  = get_detailed_scores_v12(df, macro, si, fib, htf_bias, ticker=ticker)
             smc_zones  = deteksi_smc_v2(df)
             last_close = float(df.iloc[-1]['Close'])
             prev_close = float(df.iloc[-2]['Close'])
             pct        = ((last_close - prev_close) / prev_close) * 100
             last_atr   = float(df.iloc[-1].get('ATR', 0)) if 'ATR' in df.columns else None
-            ai         = generate_ai_judgment(score_res, fib, smc_zones, last_close, atr=last_atr, ticker=active_ticker)
+            ai         = generate_ai_judgment(score_res, fib, smc_zones, last_close, atr=last_atr, ticker=ticker)
             mtf        = get_mtf_scores(ticker, macro, si)
 
             if last_close > float(df.iloc[-1].get('EMA200', 0)) and last_close > float(df.iloc[-1].get('EMA50', 0)):

@@ -98,7 +98,7 @@ def log_signal(ticker, pair_name, decision, confidence, q_score, pa_signal, plan
                 del db_entry["rr"] # RR is not in our SQL schema
             if "opened_at_iso" in db_entry:
                 del db_entry["opened_at_iso"]
-            client.table("trade_journal").insert(db_entry)
+            client.table("trade_journal").insert(db_entry).execute()
         except Exception as e:
             print(f"[Supabase] log_signal error: {e}")
             
@@ -115,7 +115,7 @@ def follow_signal(trade_id):
             client = get_supabase_client()
             if client:
                 try:
-                    client.table("trade_journal").eq("id", trade_id).update({"status": "OPEN"})
+                    client.table("trade_journal").update({"status": "OPEN"}).eq("id", trade_id).execute()
                 except Exception as e:
                     print(f"[Supabase] follow_signal error: {e}")
             t["status"] = "OPEN"
@@ -132,7 +132,7 @@ def skip_signal(trade_id):
             client = get_supabase_client()
             if client:
                 try:
-                    client.table("trade_journal").eq("id", trade_id).update({"status": "SKIPPED"})
+                    client.table("trade_journal").update({"status": "SKIPPED"}).eq("id", trade_id).execute()
                 except Exception as e:
                     print(f"[Supabase] skip_signal error: {e}")
             t["status"] = "SKIPPED"
@@ -150,14 +150,14 @@ def close_trade(trade_id, result, exit_price, pips_result, notes="", reason="MAN
             client = get_supabase_client()
             if client:
                 try:
-                    client.table("trade_journal").eq("id", trade_id).update({
+                    client.table("trade_journal").update({
                         "status": result,
                         "exit_price": exit_price,
                         "pips_result": pips_result,
                         "notes": notes,
                         "close_reason": reason,
                         "closed_at": closed_time
-                    })
+                    }).eq("id", trade_id).execute()
                 except Exception as e:
                     print(f"[Supabase] close_trade error: {e}")
                     
@@ -177,7 +177,7 @@ def delete_trade(trade_id):
     client = get_supabase_client()
     if client:
         try:
-            client.table("trade_journal").eq("id", trade_id).delete()
+            client.table("trade_journal").delete().eq("id", trade_id).execute()
         except Exception as e:
             print(f"[Supabase] delete_trade error: {e}")
             
@@ -287,7 +287,11 @@ def sync_open_trades():
 
                     # Ambiguous candle: both SL and TP touched — skip, can't determine order
                     if sl_hit and tp_hit:
-                        continue
+                        # Ambiguous candle: assume worst case (SL hit first)
+                        pips = (sl - entry_price) * pip_mult
+                        _close_synced(trade, "LOSS", sl, pips, candle_date, "SL_HIT")
+                        synced += 1
+                        break
 
                     # Check TP first (benefit of the doubt)
                     if tp_hit:
@@ -314,7 +318,11 @@ def sync_open_trades():
 
                     # Ambiguous candle: both SL and TP touched — skip
                     if sl_hit and tp_hit:
-                        continue
+                        # Ambiguous candle: assume worst case (SL hit first)
+                        pips = (entry_price - sl) * pip_mult
+                        _close_synced(trade, "LOSS", sl, pips, candle_date, "SL_HIT")
+                        synced += 1
+                        break
 
                     # Check TP first (benefit of the doubt)
                     if tp_hit:
@@ -358,7 +366,7 @@ def _close_synced(trade, result, exit_price, pips, candle_date, reason):
     client = get_supabase_client()
     if client:
         try:
-            client.table("trade_journal").eq("id", trade["id"]).update({
+            client.table("trade_journal").update({
                 "status": result,
                 "exit_price": exit_price,
                 "pips_result": round(pips, 1),
@@ -366,7 +374,7 @@ def _close_synced(trade, result, exit_price, pips, candle_date, reason):
                 "closed_at": candle_date,
                 "closed_at_candle": candle_date,
                 "notes": notes
-            })
+            }).eq("id", trade["id"]).execute()
         except Exception as e:
             print(f"[Supabase] _close_synced error: {e}")
 

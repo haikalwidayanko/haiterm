@@ -125,7 +125,7 @@ def add_user(username, password, role, market_access, can_access_journal, telegr
                 "market_access": market_access,
                 "can_access_journal": can_access_journal,
                 "telegram_chat_id": telegram_chat_id
-            })
+            }).execute()
         except Exception as e:
             print(f"[Supabase] add_user error: {e}")
             # Check if error is due to missing telegram_chat_id column
@@ -147,7 +147,7 @@ def add_user(username, password, role, market_access, can_access_journal, telegr
                         "role": role,
                         "market_access": market_access,
                         "can_access_journal": can_access_journal
-                    })
+                    }).execute()
                 except Exception as retry_err:
                     print(f"[Supabase] Retry add_user error: {retry_err}")
                     return False, f"Supabase error: {retry_err}"
@@ -172,12 +172,12 @@ def update_user(username, role, market_access, can_access_journal, telegram_chat
     client = get_supabase_client()
     if client:
         try:
-            client.table("users").eq("username", username).update({
+            client.table("users").update({
                 "role": role,
                 "market_access": market_access,
                 "can_access_journal": can_access_journal,
                 "telegram_chat_id": telegram_chat_id
-            })
+            }).eq("username", username).execute()
         except Exception as e:
             print(f"[Supabase] update_user error: {e}")
             # Check if error is due to missing telegram_chat_id column
@@ -193,11 +193,11 @@ def update_user(username, role, market_access, can_access_journal, telegram_chat
             if is_missing_tg:
                 print("[Supabase] telegram_chat_id column missing. Retrying without it...")
                 try:
-                    client.table("users").eq("username", username).update({
+                    client.table("users").update({
                         "role": role,
                         "market_access": market_access,
                         "can_access_journal": can_access_journal
-                    })
+                    }).eq("username", username).execute()
                 except Exception as retry_err:
                     print(f"[Supabase] Retry update_user error: {retry_err}")
                     return False, f"Supabase error: {retry_err}"
@@ -222,7 +222,7 @@ def delete_user(username):
         client = get_supabase_client()
         if client:
             try:
-                client.table("users").eq("username", username).delete()
+                client.table("users").delete().eq("username", username).execute()
             except Exception as e:
                 print(f"[Supabase] delete_user error: {e}")
                 return False, f"Supabase error: {e}"
@@ -239,9 +239,9 @@ def change_password(username, new_password):
         client = get_supabase_client()
         if client:
             try:
-                client.table("users").eq("username", username).update({
+                client.table("users").update({
                     "password": hashed
-                })
+                }).eq("username", username).execute()
             except Exception as e:
                 print(f"[Supabase] change_password error: {e}")
                 return False, f"Supabase error: {e}"

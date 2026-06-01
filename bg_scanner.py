@@ -74,7 +74,7 @@ def run_background_scan(username):
                 df_htf = hitung_indikator_lengkap(df_htf)
                 htf_bias = 1 if df_htf.iloc[-1]['Close'] > df_htf.iloc[-1]['EMA50'] else -1
 
-            score_res = get_detailed_scores_v12(df, macro, si, fib, htf_bias)
+            score_res = get_detailed_scores_v12(df, macro, si, fib, htf_bias, ticker=ticker)
             smc_zones = deteksi_smc_v2(df)
             last_close = float(df.iloc[-1]['Close'])
             last_atr = float(df.iloc[-1].get('ATR', 0)) if 'ATR' in df.columns else None
