@@ -41,6 +41,17 @@ def _save_local_db(data: dict):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+def _load_local_db() -> dict:
+    """Always reads from local file only — used in write operations to avoid
+    overwriting local users with potentially incomplete Supabase data."""
+    if not os.path.exists(DB_FILE):
+        return {}
+    with open(DB_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except:
+            return {}
+
 def init_db():
     db = _load_db()
     if not db:
@@ -110,7 +121,7 @@ def get_all_telegram_ids():
     return list(set(ids))
 
 def add_user(username, password, role, market_access, can_access_journal, telegram_chat_id=""):
-    db = _load_db()
+    db = _load_local_db()
     if username in db:
         return False, "User already exists"
     
@@ -165,7 +176,7 @@ def add_user(username, password, role, market_access, can_access_journal, telegr
     return True, "User created successfully"
 
 def update_user(username, role, market_access, can_access_journal, telegram_chat_id=""):
-    db = _load_db()
+    db = _load_local_db()
     if username not in db:
         return False, "User not found"
         
@@ -212,7 +223,7 @@ def update_user(username, role, market_access, can_access_journal, telegram_chat
     return True, "User updated successfully"
 
 def delete_user(username):
-    db = _load_db()
+    db = _load_local_db()
     if db.get(username, {}).get("role") == "admin":
         admins = [u for u, d in db.items() if d.get("role") == "admin"]
         if len(admins) <= 1:
@@ -233,7 +244,7 @@ def delete_user(username):
     return False, "User not found"
 
 def change_password(username, new_password):
-    db = _load_db()
+    db = _load_local_db()
     if username in db:
         hashed = hash_password(new_password)
         client = get_supabase_client()

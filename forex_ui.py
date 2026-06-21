@@ -17,13 +17,11 @@ def render_forex_scanner(tf="1h", category="Forex"):
     username = st.session_state.get("username", "")
     raw_list = [t for t in raw_list if has_pair_access(username, t)]
     
-    # Filter by category
-    if category == "Forex":
-        forex_list = [t for t in raw_list if FOREX_PAIRS.get(t, {}).get('group') in ("Major", "Minor")]
-    elif category == "Crypto":
+    # Filter by category. Forex now includes merged Metals (Gold/Silver) and Energy (Oil).
+    if category == "Crypto":
         forex_list = [t for t in raw_list if FOREX_PAIRS.get(t, {}).get('group') == "Crypto"]
     else:
-        forex_list = [t for t in raw_list if FOREX_PAIRS.get(t, {}).get('group') in ("Metals", "Energy", "Agriculture")]
+        forex_list = [t for t in raw_list if FOREX_PAIRS.get(t, {}).get('group') in ("Major", "Minor", "Metals", "Energy")]
 
     results = []
     prog = st.progress(0, text="Scanning forex markets...")
@@ -96,15 +94,13 @@ def render_forex_scanner(tf="1h", category="Forex"):
         g = r['info'].get('group', 'Other')
         groups.setdefault(g, []).append(r)
 
-    group_order  = ["Major", "Minor", "Crypto", "Metals", "Energy", "Agriculture", "Commodity", "Other"]
+    group_order  = ["Major", "Minor", "Metals", "Energy", "Crypto", "Other"]
     group_labels = {
-        "Major": "⚛️ MAJOR PAIRS", 
-        "Minor": "🔀 MINOR / CROSS", 
-        "Crypto": "🪙 CRYPTO",
-        "Metals": "🥇 METALS", 
+        "Major": "⚛️ MAJOR PAIRS",
+        "Minor": "🔀 MINOR / CROSS",
+        "Metals": "🥇 METALS",
         "Energy": "⚡ ENERGY",
-        "Agriculture": "🌾 AGRICULTURE",
-        "Commodity": "🛢️ COMMODITY",
+        "Crypto": "🪙 CRYPTO",
         "Other": "📁 OTHER"
     }
 

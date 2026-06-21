@@ -14,7 +14,6 @@ from engine import (
 )
 from ai_hub import generate_ai_judgment
 from auth import has_pair_access
-from journal import log_signal
 
 SCAN_STATE_FILE = "scan_state.json"
 tz_jkt = pytz.timezone("Asia/Jakarta")
@@ -112,16 +111,6 @@ def run_background_scan(username):
                 if _should_alert(state, ticker, candle_key):
                     plan = ai.get("plan", {})
                     _send_bg_alert(pair_name, last_close, ai, score_res, plan, m_note)
-                    log_signal(
-                        ticker=ticker,
-                        pair_name=pair_name,
-                        decision=decision,
-                        confidence=ai.get("confidence", 0),
-                        q_score=score_res.get("total", 0),
-                        pa_signal=ai.get("pa_signal", "NONE"),
-                        plan=plan,
-                        price=last_close,
-                    )
                     state.setdefault("last_alerts", {})[ticker] = candle_key
 
         except Exception as e:

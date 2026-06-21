@@ -24,23 +24,25 @@ FOREX_PAIRS = {
     "GBPJPY=X": {"name": "GBP/JPY",         "group": "Minor"},
     "EURAUD=X": {"name": "EUR/AUD",         "group": "Minor"},
     "GBPAUD=X": {"name": "GBP/AUD",         "group": "Minor"},
-    # --- METALS (3) ---
+    # --- METALS (2) — merged into Forex category ---
     "GC=F":     {"name": "XAU/USD (Gold)",   "group": "Metals"},
     "SI=F":     {"name": "XAG/USD (Silver)", "group": "Metals"},
-    "HG=F":     {"name": "Copper",           "group": "Metals"},
-    # --- ENERGY (2) ---
+    # --- ENERGY (1) — merged into Forex category ---
     "CL=F":     {"name": "Crude Oil (WTI)",  "group": "Energy"},
-    "NG=F":     {"name": "Natural Gas",      "group": "Energy"},
-    # --- AGRICULTURE (3) ---
-    "ZW=F":     {"name": "Wheat",            "group": "Agriculture"},
-    "KC=F":     {"name": "Coffee",           "group": "Agriculture"},
-    "CC=F":     {"name": "Cocoa",            "group": "Agriculture"},
-    # --- CRYPTO (5) ---
+    # --- CRYPTO (13) ---
     "BTC-USD":  {"name": "Bitcoin (BTC)",     "group": "Crypto"},
     "ETH-USD":  {"name": "Ethereum (ETH)",    "group": "Crypto"},
     "SOL-USD":  {"name": "Solana (SOL)",      "group": "Crypto"},
     "AVAX-USD": {"name": "Avalanche (AVAX)",  "group": "Crypto"},
     "SUI20947-USD": {"name": "Sui (SUI)",      "group": "Crypto"},
+    "XRP-USD":  {"name": "Ripple (XRP)",      "group": "Crypto"},
+    "BNB-USD":  {"name": "BNB (BNB)",         "group": "Crypto"},
+    "ADA-USD":  {"name": "Cardano (ADA)",     "group": "Crypto"},
+    "DOGE-USD": {"name": "Dogecoin (DOGE)",   "group": "Crypto"},
+    "LINK-USD": {"name": "Chainlink (LINK)",  "group": "Crypto"},
+    "DOT-USD":  {"name": "Polkadot (DOT)",    "group": "Crypto"},
+    "LTC-USD":  {"name": "Litecoin (LTC)",    "group": "Crypto"},
+    "TRX-USD":  {"name": "Tron (TRX)",        "group": "Crypto"},
 }
 
 TICKER_SEARCH_MAP = {
@@ -51,17 +53,20 @@ TICKER_SEARCH_MAP = {
     "EURJPY=X": "EUR JPY euro yen",           "GBPJPY=X": "GBP JPY pound yen",
     "EURAUD=X": "EUR AUD euro australian",    "GBPAUD=X": "GBP AUD pound australian",
     "GC=F":     "gold price XAU commodity",   "SI=F":     "silver price XAG commodity",
-    "HG=F":     "copper price commodity",     
-    "CL=F":     "crude oil WTI price",        
-    "NG=F":     "natural gas price energy",   
-    "ZW=F":     "wheat price agriculture",    
-    "KC=F":     "coffee price commodity",
-    "CC=F":     "cocoa price agriculture",
+    "CL=F":     "crude oil WTI price",
     "BTC-USD":  "bitcoin BTC crypto price",
     "ETH-USD":  "ethereum ETH crypto price",
     "SOL-USD":  "solana SOL crypto price",
     "AVAX-USD": "avalanche AVAX crypto defi",
     "SUI20947-USD": "sui SUI crypto blockchain",
+    "XRP-USD":  "ripple XRP crypto price",
+    "BNB-USD":  "binance coin BNB crypto",
+    "ADA-USD":  "cardano ADA crypto price",
+    "DOGE-USD": "dogecoin DOGE crypto price",
+    "LINK-USD": "chainlink LINK crypto oracle",
+    "DOT-USD":  "polkadot DOT crypto price",
+    "LTC-USD":  "litecoin LTC crypto price",
+    "TRX-USD":  "tron TRX crypto price",
 }
 
 

@@ -42,6 +42,128 @@ PIP_VALUE_PER_LOT = {
 
 
 # ============================================================
+# PIP / SIZING / MARKET HELPERS
+# ============================================================
+
+def _pip_mult(ticker: str) -> int:
+    """Price-difference → pips multiplier."""
+    if "-USD" in ticker:        # crypto
+        return 1
+    if "JPY" in ticker:
+        return 100
+    if ticker.endswith("=F"):   # gold / silver / oil
+        return 1
+    return 10000
+
+
+# Per-lot USD value untuk komoditas (perkiraan kontrak standar CFD).
+# Penting untuk risk sizing supaya lot tidak meledak. Untuk LIVE, lot tetap
+# di-clamp ke batas broker, tapi nilai ini menjaga estimasi risiko tetap waras.
+COMMODITY_PIP_VALUE = {
+    "GC=F": 100.0,   # Gold (XAUUSD): ~100 oz/lot → $1 gerak = ~$100/lot
+    "SI=F": 50.0,    # Silver (XAGUSD): perkiraan konservatif
+    "CL=F": 10.0,    # Crude Oil (WTI): perkiraan konservatif
+}
+
+
+def _pip_value_per_lot(ticker: str) -> float:
+    """Approx USD value per pip per 1.0 lot."""
+    if "-USD" in ticker:
+        return PIP_VALUE_PER_LOT["CRYPTO"]
+    if "JPY" in ticker:
+        return PIP_VALUE_PER_LOT["JPY"]
+    if ticker.endswith("=F"):
+        return COMMODITY_PIP_VALUE.get(ticker, PIP_VALUE_PER_LOT["COMMO"])
+    return PIP_VALUE_PER_LOT["default"]
+
+
+def calc_position_size(capital, risk_percent, sl_price_distance, ticker, lot_fallback=0.01, max_lot=5.0):
+    """
+    Lot berdasarkan risiko: risk_amount / (sl_pips × pip_value_per_lot).
+    Dibatasi minimal 0.01 lot dan maksimal max_lot (safety net). Fallback kalau tak valid.
+    """
+    try:
+        risk_amount  = float(capital) * (float(risk_percent) / 100.0)
+        sl_pips      = abs(sl_price_distance) * _pip_mult(ticker)
+        risk_per_lot = sl_pips * _pip_value_per_lot(ticker)
+        if risk_per_lot <= 0 or risk_amount <= 0:
+            return lot_fallback
+        lot = risk_amount / risk_per_lot
+        return min(max(round(lot, 2), 0.01), max_lot)
+    except Exception:
+        return lot_fallback
+
+
+def _is_market_open(ticker: str) -> bool:
+    """Crypto 24/7. Forex/komoditas tutup di akhir pekan (perkiraan, basis UTC)."""
+    if "-USD" in ticker:
+        return True
+    import pytz as _pytz
+    now = datetime.now(_pytz.utc)
+    wd, h = now.weekday(), now.hour   # Mon=0 .. Sun=6
+    if wd == 5:                       # Sabtu
+        return False
+    if wd == 6 and h < 21:            # Minggu sebelum market buka (~21:00 UTC)
+        return False
+    if wd == 4 and h >= 21:           # Jumat setelah market tutup
+        return False
+    return True
+
+
+# ============================================================
+# CIRCUIT BREAKER / RISK GUARDS
+# ============================================================
+
+def get_today_realized_pnl(profile_id: str) -> float:
+    """Total realized PnL (USD) untuk trade profil ini yang ditutup HARI INI (WIB)."""
+    today = datetime.now(tz_jkt).strftime("%Y-%m-%d")
+    total = 0.0
+    for t in _load_sim_trades():
+        if t.get("profile_id") != profile_id:
+            continue
+        if t.get("status") not in ("WIN", "LOSS", "BE"):
+            continue
+        if (t.get("closed_at", "") or "")[:10] == today:
+            total += t.get("pnl_usd", 0) or 0
+    return round(total, 2)
+
+
+def get_loss_streak(profile_id: str) -> int:
+    """Jumlah LOSS beruntun dihitung dari trade paling baru ditutup."""
+    closed = [t for t in _load_sim_trades()
+              if t.get("profile_id") == profile_id and t.get("status") in ("WIN", "LOSS", "BE")]
+    closed.sort(key=lambda x: (x.get("closed_at", "") or ""), reverse=True)
+    streak = 0
+    for t in closed:
+        if t.get("status") == "LOSS":
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def check_circuit_breaker(profile: dict) -> tuple:
+    """
+    Cek apakah auto-trade boleh jalan.
+    Return (allowed: bool, reason: str).
+    """
+    capital   = profile.get("capital", 1000)
+    max_dd    = profile.get("max_daily_loss_pct", 5.0)
+    max_strk  = profile.get("max_loss_streak", 4)
+
+    today_pnl = get_today_realized_pnl(profile["id"])
+    loss_limit = -abs(capital * max_dd / 100.0)
+    if today_pnl <= loss_limit:
+        return False, f"🛑 Rugi harian ${today_pnl:.2f} ≥ batas ${loss_limit:.2f} — auto-trade dihentikan hari ini."
+
+    streak = get_loss_streak(profile["id"])
+    if streak >= max_strk:
+        return False, f"🛑 {streak} LOSS beruntun ≥ batas {max_strk} — auto-trade dijeda."
+
+    return True, ""
+
+
+# ============================================================
 # LOCAL FILE I/O
 # ============================================================
 
@@ -89,6 +211,11 @@ def create_profile(
     max_open_trades: int = 3,
     sl_atr_mult: float = 1.5,
     tp_atr_mult: float = 4.5,
+    use_risk_sizing: bool = True,
+    risk_percent: float = 1.0,
+    max_daily_loss_pct: float = 5.0,
+    max_loss_streak: int = 4,
+    live_mode: bool = False,
 ) -> dict:
     """Buat profil auto trading baru."""
     profiles = _load_profiles()
@@ -105,7 +232,13 @@ def create_profile(
         "max_open_trades": int(max_open_trades),
         "sl_atr_mult":    float(sl_atr_mult),
         "tp_atr_mult":    float(tp_atr_mult),
+        # Risk management
+        "use_risk_sizing":    bool(use_risk_sizing),   # lot dihitung dari risk% × modal
+        "risk_percent":       float(risk_percent),     # % modal yang dirisiko per trade
+        "max_daily_loss_pct": float(max_daily_loss_pct),
+        "max_loss_streak":    int(max_loss_streak),
         "is_active":      True,
+        "live_mode":      bool(live_mode),  # False = sim only, True = kirim ke MT5 juga
         "created_at":     now,
         "last_scan_at":   None,
         # Running totals
@@ -276,10 +409,13 @@ def _place_sim_order(
     score_audit: dict = None,
     ai_reasoning: list = None,
     pa_signal: str = "",
+    lot_override: float = None,
 ) -> dict:
     """Buat sim trade baru dan kirim notif Telegram."""
     trades = _load_sim_trades()
     now = datetime.now(tz_jkt)
+
+    lot = lot_override if (lot_override and lot_override > 0) else profile["lot_size"]
 
     trade = {
         "id":           str(uuid.uuid4())[:8],
@@ -289,7 +425,7 @@ def _place_sim_order(
         "ticker":       ticker,
         "pair_name":    pair_name,
         "direction":    direction,      # "BUY" or "SELL"
-        "lot_size":     profile["lot_size"],
+        "lot_size":     lot,
         "capital":      profile["capital"],
         "entry_price":  entry_price,
         "sl":           sl,
@@ -307,6 +443,10 @@ def _place_sim_order(
         "closed_at":    None,
         "opened_at":    now.isoformat(),
         "opened_at_str": now.strftime("%Y-%m-%d %H:%M WIB"),
+        # MT5 live trade info
+        "mt5_ticket":   None,
+        "mt5_symbol":   None,
+        "is_live":      False,
         # Snapshot analisis saat entry — untuk trade review
         "entry_score_details": score_details or {},
         "entry_score_audit":   score_audit or {},
@@ -317,12 +457,44 @@ def _place_sim_order(
     trades.append(trade)
     _save_sim_trades(trades)
 
-    # Update profile totals
-    update_profile(
-        profile["id"],
-        total_trades=profile.get("total_trades", 0) + 1,
-        last_scan_at=now.isoformat()
-    )
+    # ── Kirim ke MT5 jika profil live_mode aktif ──────────────
+    if profile.get("live_mode") and profile.get("is_active"):
+        try:
+            from mt5_bridge import place_order, load_mt5_config, get_mt5_symbol, is_connected
+            if is_connected():
+                cfg = load_mt5_config()
+                ticket, msg = place_order(
+                    ticker=ticker,
+                    direction=direction,
+                    lot=lot,
+                    sl=sl,
+                    tp=tp2,
+                    comment=f"W-{trade['id']}",
+                    config=cfg,
+                )
+                if ticket:
+                    # Update trade dengan ticket MT5
+                    for t in trades:
+                        if t["id"] == trade["id"]:
+                            t["mt5_ticket"] = ticket
+                            t["mt5_symbol"] = get_mt5_symbol(ticker, cfg)
+                            t["is_live"] = True
+                            break
+                    _save_sim_trades(trades)
+                    trade["mt5_ticket"] = ticket
+                    trade["is_live"] = True
+                    print(f"[MT5] {msg}")
+                else:
+                    print(f"[MT5] Order gagal: {msg}")
+            else:
+                print("[MT5] Live mode aktif tapi MT5 tidak terhubung — trade disimpan sebagai sim")
+        except Exception as e:
+            print(f"[MT5] place_order error: {e}")
+
+    # Update last activity timestamp. (total_trades is derived from the actual
+    # trade list in get_profile_stats, so we don't increment a stale counter here —
+    # doing so undercounted when multiple orders were placed in one scan.)
+    update_profile(profile["id"], last_scan_at=now.isoformat())
 
     # Kirim notif Telegram
     _send_order_telegram(trade)
@@ -330,32 +502,24 @@ def _place_sim_order(
     return trade
 
 
-def _close_sim_trade(trade: dict, result: str, exit_price: float, pips: float, reason: str):
-    """Tutup trade simulasi, hitung PnL, dan kirim notif Telegram."""
+def _close_sim_trade(trade: dict, result: str, exit_price: float, pips: float, reason: str,
+                     pnl_override: float = None, close_mt5: bool = True):
+    """
+    Tutup trade simulasi, hitung PnL, dan kirim notif Telegram.
+    pnl_override : pakai PnL aktual dari broker (rekonsiliasi MT5) alih-alih hitung sendiri.
+    close_mt5    : kirim perintah close ke MT5 (False kalau posisi sudah tertutup di broker).
+    """
     trades = _load_sim_trades()
     lot_size = trade.get("lot_size", 0.01)
     closed_at = datetime.now(tz_jkt).strftime("%Y-%m-%d %H:%M WIB")
 
     # Calculate PnL in USD
     ticker = trade.get("ticker", "")
-    is_jpy     = "JPY" in ticker
-    is_crypto  = "-USD" in ticker
-    is_commo   = ticker.endswith("=F")
 
-    if is_crypto:
-        pip_val = PIP_VALUE_PER_LOT["CRYPTO"] * lot_size
-        pnl_usd = pips * pip_val
-    elif is_jpy:
-        pip_val = PIP_VALUE_PER_LOT["JPY"] * lot_size
-        pnl_usd = pips * pip_val
-    elif is_commo:
-        pip_val = PIP_VALUE_PER_LOT["COMMO"] * lot_size
-        pnl_usd = pips * pip_val
+    if pnl_override is not None:
+        pnl_usd = round(pnl_override, 2)
     else:
-        pip_val = PIP_VALUE_PER_LOT["default"] * lot_size
-        pnl_usd = pips * pip_val
-
-    pnl_usd = round(pnl_usd, 2)
+        pnl_usd = round(pips * _pip_value_per_lot(ticker) * lot_size, 2)
 
     for t in trades:
         if t["id"] == trade["id"]:
@@ -368,6 +532,19 @@ def _close_sim_trade(trade: dict, result: str, exit_price: float, pips: float, r
             break
 
     _save_sim_trades(trades)
+
+    # ── Tutup posisi MT5 jika trade ini live ──────────────────
+    mt5_ticket = trade.get("mt5_ticket")
+    if close_mt5 and mt5_ticket and trade.get("is_live"):
+        try:
+            from mt5_bridge import close_position, is_connected
+            if is_connected():
+                ok, msg = close_position(int(mt5_ticket))
+                print(f"[MT5] Close ticket #{mt5_ticket}: {msg}")
+            else:
+                print(f"[MT5] MT5 tidak terhubung — tidak bisa close ticket #{mt5_ticket}")
+        except Exception as e:
+            print(f"[MT5] close_position error: {e}")
 
     # Update profile totals
     profile = get_profile_by_id(trade["profile_id"])
@@ -417,11 +594,21 @@ def run_auto_scan(profile: dict) -> dict:
         result["details"].append("⏸️ Profil tidak aktif, scan dilewati.")
         return result
 
-    min_q  = profile.get("min_q_score", 8)
-    max_ot = profile.get("max_open_trades", 3)
-    pairs  = profile.get("pairs", [])
-    sl_m   = profile.get("sl_atr_mult", 1.5)
-    tp_m   = profile.get("tp_atr_mult", 4.5)
+    # ── CIRCUIT BREAKER — stop kalau rugi harian / loss streak tembus batas ──
+    allowed, cb_reason = check_circuit_breaker(profile)
+    if not allowed:
+        result["details"].append(cb_reason)
+        result["halted"] = True
+        return result
+
+    min_q    = profile.get("min_q_score", 8)
+    max_ot   = profile.get("max_open_trades", 3)
+    pairs    = profile.get("pairs", [])
+    sl_m     = profile.get("sl_atr_mult", 1.5)
+    tp_m     = profile.get("tp_atr_mult", 4.5)
+    capital  = profile.get("capital", 1000)
+    use_risk = profile.get("use_risk_sizing", True)
+    risk_pct = profile.get("risk_percent", 1.0)
 
     # Check global open count for this profile
     open_trades = get_sim_trades(profile["id"], status_filter="OPEN")
@@ -452,6 +639,23 @@ def run_auto_scan(profile: dict) -> dict:
             result["details"].append(f"⏭️ {ticker} — max trades reached.")
             continue
 
+        # Skip if market closed (weekend) for non-crypto
+        if not _is_market_open(ticker):
+            result["skipped"] += 1
+            result["details"].append(f"🌙 {ticker} — Market tutup (weekend), skip.")
+            continue
+
+        # Profil LIVE: lewati pair yang tidak tersedia di broker (mis. crypto di broker forex)
+        if profile.get("live_mode"):
+            try:
+                from mt5_bridge import symbol_exists, is_connected as _mt5_conn
+                if _mt5_conn() and not symbol_exists(ticker):
+                    result["skipped"] += 1
+                    result["details"].append(f"🚫 {ticker} — tidak tersedia di broker, skip (live).")
+                    continue
+            except Exception:
+                pass
+
         try:
             # Check news shield
             news_alerts = check_news_shield(ticker)
@@ -479,7 +683,7 @@ def run_auto_scan(profile: dict) -> dict:
                 df_htf = hitung_indikator_lengkap(df_htf_raw)
                 htf_bias = 1 if df_htf.iloc[-1]["Close"] > df_htf.iloc[-1]["EMA50"] else -1
 
-            score_res = get_detailed_scores_v12(df, macro, si, fib, htf_bias)
+            score_res = get_detailed_scores_v12(df, macro, si, fib, htf_bias, ticker=ticker)
             q_total = score_res.get("total", 0)
 
             # Check threshold
@@ -507,12 +711,39 @@ def run_auto_scan(profile: dict) -> dict:
             direction = "BUY" if "BUY" in decision else "SELL"
             plan = ai_data.get("plan", {})
             entry = plan.get("entry", last_close)
-            sl    = plan.get("sl", (entry - sl_m * atr) if direction == "BUY" else (entry + sl_m * atr))
-            tp1   = plan.get("tp1", 0)
-            tp2   = plan.get("tp2", 0)
-            tp3   = plan.get("tp3", 0)
+
+            # Auto-trader risk is governed by the profile's ATR multipliers
+            # (deterministic risk management), NOT the discretionary fib-based
+            # SL/TP from the AI plan. This makes the UI sliders actually control risk.
+            if atr and atr > 0:
+                risk   = sl_m * atr   # SL distance
+                reward = tp_m * atr   # main target (TP2) distance
+                if direction == "BUY":
+                    sl  = entry - risk
+                    tp1 = entry + reward * 0.5
+                    tp2 = entry + reward
+                    tp3 = entry + reward * 1.5
+                else:
+                    sl  = entry + risk
+                    tp1 = entry - reward * 0.5
+                    tp2 = entry - reward
+                    tp3 = entry - reward * 1.5
+            else:
+                # ATR unavailable → fall back to AI plan levels
+                sl    = plan.get("sl", entry * (0.995 if direction == "BUY" else 1.005))
+                tp1   = plan.get("tp1", 0)
+                tp2   = plan.get("tp2", 0)
+                tp3   = plan.get("tp3", 0)
 
             pair_name = FOREX_PAIRS.get(ticker, {}).get("name", ticker.replace("=X", "").replace("=F", ""))
+
+            # ── Risk-based position sizing ────────────────────────
+            # Lot dihitung dari risk% × modal dibagi jarak SL → risiko $ konsisten.
+            if use_risk:
+                lot = calc_position_size(capital, risk_pct, abs(entry - sl), ticker,
+                                         lot_fallback=profile.get("lot_size", 0.01))
+            else:
+                lot = profile.get("lot_size", 0.01)
 
             _place_sim_order(
                 profile=profile,
@@ -531,11 +762,12 @@ def run_auto_scan(profile: dict) -> dict:
                 score_audit=score_res.get("audit", {}),
                 ai_reasoning=ai_data.get("reasons", []),
                 pa_signal=score_res.get("pa_data", {}).get("signal", ""),
+                lot_override=lot,
             )
 
             result["new_orders"] += 1
             result["details"].append(
-                f"✅ {pair_name} — {direction} @ {entry:.5f} | Q={q_total:+} | Conf={ai_data.get('confidence',0)}%"
+                f"✅ {pair_name} — {direction} {lot} lot @ {entry:.5f} | Q={q_total:+} | Conf={ai_data.get('confidence',0)}%"
             )
 
         except Exception as e:
@@ -559,12 +791,12 @@ def sync_sim_trades(profile_id: str) -> int:
     """
     from data_provider import fetch_forex_data
 
+    # Trade live ditutup di broker (SL/TP kena di MT5) → rekonsiliasi PnL aktual dulu.
+    synced = reconcile_live_trades(profile_id)
+
     open_trades = get_sim_trades(profile_id, status_filter="OPEN")
     if not open_trades:
-        return 0
-
-    trades_all = _load_sim_trades()
-    synced = 0
+        return synced
 
     for trade in open_trades:
         ticker    = trade["ticker"]
@@ -576,8 +808,13 @@ def sync_sim_trades(profile_id: str) -> int:
         if not sl or not entry:
             continue
 
+        # Trade live yang masih open dikelola broker (SL/TP terpasang di MT5),
+        # jangan disimulasikan pakai data yfinance — biar rekonsiliasi yang urus.
+        if trade.get("is_live") and trade.get("mt5_ticket"):
+            continue
+
         try:
-            df = fetch_forex_data(ticker, period="7d", interval="15m")
+            df = fetch_forex_data(ticker, period="30d", interval="15m")
             if df is None or df.empty:
                 continue
 
@@ -615,13 +852,20 @@ def sync_sim_trades(profile_id: str) -> int:
             else:
                 pip_mult = 10000
 
+            # Spread/slippage buffer (harga) — hindari SL palsu dari wick tipis.
+            # ~2 pips untuk forex/JPY, 0.05% untuk crypto/komoditas.
+            if is_crypto or is_commo:
+                buffer = entry * 0.0005
+            else:
+                buffer = 2.0 / pip_mult   # 2 pips dalam satuan harga
+
             for idx, row in df.iterrows():
                 high  = float(row["High"])
                 low   = float(row["Low"])
                 candle = idx.strftime("%Y-%m-%d %H:%M")
 
                 if direction == "BUY":
-                    sl_hit = sl > 0 and low <= sl
+                    sl_hit = sl > 0 and low <= (sl - buffer)
                     tp_hit = tp2 > 0 and high >= tp2
 
                     if sl_hit and tp_hit:
@@ -641,7 +885,7 @@ def sync_sim_trades(profile_id: str) -> int:
                         synced += 1
                         break
                 else:  # SELL
-                    sl_hit = sl > 0 and high >= sl
+                    sl_hit = sl > 0 and high >= (sl + buffer)
                     tp_hit = tp2 > 0 and low <= tp2
 
                     if sl_hit and tp_hit:
@@ -666,6 +910,69 @@ def sync_sim_trades(profile_id: str) -> int:
             continue
 
     return synced
+
+
+def reconcile_live_trades(profile_id: str) -> int:
+    """
+    Untuk trade LIVE yang sudah ditutup di broker (SL/TP kena di MT5),
+    update record sim dengan PnL & harga aktual dari riwayat MT5.
+    Return jumlah trade yang berhasil direkonsiliasi.
+    """
+    try:
+        from mt5_bridge import is_connected, get_open_positions, get_trade_history
+    except Exception:
+        return 0
+    if not is_connected():
+        return 0
+
+    live_open = [t for t in get_sim_trades(profile_id, status_filter="OPEN")
+                 if t.get("is_live") and t.get("mt5_ticket")]
+    if not live_open:
+        return 0
+
+    open_tickets = {p["ticket"] for p in get_open_positions()}
+    history = get_trade_history(days=30)
+    reconciled = 0
+
+    for t in live_open:
+        try:
+            ticket = int(t["mt5_ticket"])
+        except (TypeError, ValueError):
+            continue
+        if ticket in open_tickets:
+            continue  # masih open di broker
+
+        # Cari deal penutup di history (cocokkan via position_id atau ticket)
+        deal = next((h for h in history
+                     if h.get("position_id") == ticket or h.get("ticket") == ticket), None)
+        if not deal:
+            continue
+
+        profit     = deal.get("profit", 0)
+        exit_price = deal.get("price", t.get("entry_price", 0))
+        result     = "WIN" if profit > 0 else ("LOSS" if profit < 0 else "BE")
+        entry      = t.get("entry_price", 0)
+        pip_mult   = _pip_mult(t["ticker"])
+        if t.get("direction") == "BUY":
+            pips = (exit_price - entry) * pip_mult
+        else:
+            pips = (entry - exit_price) * pip_mult
+
+        # close_mt5=False (posisi sudah tertutup di broker), pakai PnL aktual broker
+        _close_sim_trade(t, result, exit_price, round(pips, 1), "MT5_RECONCILE",
+                         pnl_override=profit, close_mt5=False)
+        reconciled += 1
+
+    return reconciled
+
+
+def close_all_open_trades(profile_id: str) -> int:
+    """Tutup semua trade OPEN profil ini (sim + posisi MT5 jika live). Return jumlah ditutup."""
+    closed = 0
+    for t in get_sim_trades(profile_id, status_filter="OPEN"):
+        if manual_close_sim_trade(t["id"]):
+            closed += 1
+    return closed
 
 
 # ============================================================
@@ -700,6 +1007,44 @@ def get_unrealized_pnl(trade: dict, current_price: float) -> float:
     else:
         pip_val = PIP_VALUE_PER_LOT["default"] * lot_size
         return round(raw_move * pip_val * 10000, 2)
+
+
+def get_profile_pl_summary(profile: dict) -> dict:
+    """
+    Ringkasan P/L ringan untuk kartu di halaman depan.
+    realized = total PnL trade selesai; floating = PnL mengambang posisi LIVE (dari MT5).
+    Sengaja TIDAK fetch harga yfinance per-trade agar halaman depan tetap cepat.
+    """
+    pid     = profile["id"]
+    trades  = get_sim_trades(pid)
+    closed  = [t for t in trades if t.get("status") in ("WIN", "LOSS", "BE")]
+    open_t  = [t for t in trades if t.get("status") == "OPEN"]
+    realized = round(sum(t.get("pnl_usd", 0) or 0 for t in closed), 2)
+    wins = len([t for t in closed if t.get("status") == "WIN"])
+    win_rate = round(wins / len(closed) * 100, 1) if closed else 0.0
+
+    floating = 0.0
+    has_live = any(t.get("is_live") for t in open_t)
+    if has_live:
+        try:
+            from mt5_bridge import is_connected, get_open_positions
+            if is_connected():
+                live_tickets = {int(t["mt5_ticket"]) for t in open_t if t.get("mt5_ticket")}
+                for p in get_open_positions():
+                    if p["ticket"] in live_tickets:
+                        floating += p["profit"]
+        except Exception:
+            pass
+
+    return {
+        "realized":     realized,
+        "floating":     round(floating, 2),
+        "open_count":   len(open_t),
+        "closed_count": len(closed),
+        "win_rate":     win_rate,
+        "has_live":     has_live,
+        "live_mode":    profile.get("live_mode", False),
+    }
 
 
 def get_profile_stats(profile_id: str) -> dict:

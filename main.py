@@ -20,8 +20,6 @@ from ai_ui import render_ai_verdict_tab
 from forex_ui import render_forex_scanner
 from auth_ui import render_login_page, render_profile_page, render_admin_dashboard
 from auth import has_pair_access, get_session_user, destroy_session, get_user_role, get_user_config
-from journal_ui import render_journal_page
-from journal import log_signal
 from auto_trader_ui import render_auto_trader_page
 from bg_scanner import run_background_scan, get_last_scan_results, get_all_scan_results
 from calendar_ui import render_calendar_widget, render_calendar_full
@@ -131,12 +129,11 @@ if "ticker" in st.query_params:
     st.session_state.active_ticker = t
     st.session_state.app_view = "detail"
     
-    # Preserve active category based on instrument group
+    # Preserve active category based on instrument group.
+    # Metals (Gold/Silver) and Energy (Crude Oil) are merged into Forex.
     from data_provider import FOREX_PAIRS
     g = FOREX_PAIRS.get(t, {}).get("group", "")
-    if g in ("Metals", "Energy", "Agriculture", "Commodity"):
-        st.session_state.active_category = "Commodities"
-    elif g == "Crypto":
+    if g == "Crypto":
         st.session_state.active_category = "Crypto"
     else:
         st.session_state.active_category = "Forex"
@@ -190,35 +187,26 @@ with st.sidebar:
     # User Permissions
     user_config = get_user_config(st.session_state.username)
     market_access = user_config.get("market_access", "ALL")
-    can_journal = user_config.get("can_access_journal", True)
 
-    # Market Buttons
-    if market_access in ["ALL", "FOREX_CRYPTO"]:
-        if st.button("⚛️ Market Forex", use_container_width=True):
-            st.session_state.active_category = "Forex"
-            st.session_state.app_view = "scanner"
-            st.session_state.active_ticker = None
-            st.rerun()
-            
-    if market_access in ["ALL", "COMMODITIES"]:
-        if st.button("🛢️ Market Komoditas", use_container_width=True):
-            st.session_state.active_category = "Commodities"
-            st.session_state.app_view = "scanner"
-            st.session_state.active_ticker = None
-            st.rerun()
-            
-    if market_access in ["ALL", "FOREX_CRYPTO"]:
-        if st.button("🪙 Market Crypto", use_container_width=True):
-            st.session_state.active_category = "Crypto"
-            st.session_state.app_view = "scanner"
-            st.session_state.active_ticker = None
-            st.rerun()
+    # Market Buttons — only Forex (incl. Gold/Silver/Oil) and Crypto remain.
+    # Legacy "COMMODITIES" access is treated as full access.
+    if st.button("⚛️ Market Forex", use_container_width=True):
+        st.session_state.active_category = "Forex"
+        st.session_state.app_view = "scanner"
+        st.session_state.active_ticker = None
+        st.rerun()
+
+    if st.button("🪙 Market Crypto", use_container_width=True):
+        st.session_state.active_category = "Crypto"
+        st.session_state.app_view = "scanner"
+        st.session_state.active_ticker = None
+        st.rerun()
 
     st.divider()
 
     # Navigation for Detail View
     is_detail = st.session_state.app_view == "detail"
-    if is_detail or st.session_state.app_view in ["admin", "profile", "journal", "calendar", "auto_trader"]:
+    if is_detail or st.session_state.app_view in ["admin", "profile", "calendar", "auto_trader"]:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔙 BACK TO SCANNER", use_container_width=True):
             st.session_state.app_view = "scanner"
@@ -240,12 +228,6 @@ with st.sidebar:
         st.session_state.active_ticker = None
         st.rerun()
 
-    if can_journal:
-        if st.button("📓 TRADE JOURNAL", use_container_width=True):
-            st.session_state.app_view = "journal"
-            st.session_state.active_ticker = None
-            st.rerun()
-
     if st.session_state.role == "admin":
         if st.button("🤖 AUTO TRADER", use_container_width=True):
             st.session_state.app_view = "auto_trader"
@@ -264,19 +246,6 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    
-    try:
-        with open("README.html", "r", encoding="utf-8") as f:
-            readme_data = f.read()
-        st.download_button(
-            label="📘 DOWNLOAD BUKU PANDUAN",
-            data=readme_data,
-            file_name="Buku_Panduan_Widayanko_V2.html",
-            mime="text/html",
-            use_container_width=True
-        )
-    except Exception:
-        pass
 
     if st.button("🚪 LOGOUT", use_container_width=True):
         if "session_token" in st.query_params:
@@ -288,10 +257,6 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-
-    refresh_on = st.toggle("⚡ Live Sync (5m)", value=False)
-    if refresh_on:
-        st_autorefresh(interval=300000, key="clock_refresh")
 
     # Background scanner + auto trader runs automatically every hour
     st_autorefresh(interval=3600000, key="bg_scan_refresh")
@@ -309,6 +274,13 @@ with st.sidebar:
         # Jalan setiap kali bg_scan_refresh trigger (tiap jam)
         # Tidak perlu buka menu Auto Trader — aktif di semua halaman
         if st.session_state.get("role") == "admin":
+            # Auto-connect MT5 (nempel ke terminal yang sedang jalan / kredensial secrets)
+            try:
+                from mt5_bridge import auto_connect, is_connected
+                if not is_connected():
+                    auto_connect()
+            except Exception as _e:
+                print(f"[MT5 AUTO-CONNECT] {_e}")
             try:
                 from auto_trader import get_profiles, sync_sim_trades, run_auto_scan
                 _at_profiles = get_profiles(st.session_state.username)
@@ -350,10 +322,6 @@ if st.session_state.app_view == "admin":
     render_admin_dashboard()
     st.stop()
 
-if st.session_state.app_view == "journal":
-    render_journal_page()
-    st.stop()
-
 if st.session_state.app_view == "auto_trader":
     render_auto_trader_page()
     st.stop()
@@ -378,8 +346,7 @@ def _render_heatmap():
 
     cells_html = ""
     categories = [
-        ("FOREX", ["Forex", "Major", "Minor", "Exotic"]),
-        ("COMMODITIES", ["Metals", "Energy", "Agriculture", "Commodity"]),
+        ("FOREX", ["Forex", "Major", "Minor", "Exotic", "Metals", "Energy"]),
         ("CRYPTO", ["Crypto"])
     ]
     
@@ -438,6 +405,56 @@ def _render_heatmap():
     """, unsafe_allow_html=True)
 
 
+def _render_autotrader_pl():
+    """Kartu ringkasan P/L profil auto-trader di halaman depan (admin only)."""
+    if st.session_state.get("role") != "admin":
+        return
+    try:
+        from auto_trader import get_profiles, get_profile_pl_summary
+    except Exception:
+        return
+    profiles = get_profiles(st.session_state.get("username", ""))
+    if not profiles:
+        return
+
+    mt5_conn = False
+    try:
+        from mt5_bridge import is_connected
+        mt5_conn = is_connected()
+    except Exception:
+        pass
+
+    st.markdown("<p style='font-family:Orbitron;font-size:10px;color:#FFD700;letter-spacing:2px;margin:0 0 10px;'>🤖 AUTO TRADER — P/L PROFIL</p>", unsafe_allow_html=True)
+    cols = st.columns(min(len(profiles), 3))
+    for i, p in enumerate(profiles):
+        s = get_profile_pl_summary(p)
+        total = s["realized"] + s["floating"]
+        col = "#00ffcc" if total >= 0 else "#ff4b4b"
+        sign = "+" if total >= 0 else ""
+        if s["live_mode"] and mt5_conn:
+            badge = "<span style='color:#ff4b4b;font-size:9px;font-family:Orbitron;'>🔴 LIVE·MT5</span>"
+        elif s["live_mode"]:
+            badge = "<span style='color:#FFD700;font-size:9px;font-family:Orbitron;'>⚠️ LIVE·OFFLINE</span>"
+        else:
+            badge = "<span style='color:#888;font-size:9px;font-family:Orbitron;'>⚫ SIM</span>"
+        float_txt = (f"<br><span style='font-size:9px;color:#888;'>Floating (MT5): "
+                     f"{s['floating']:+,.2f}</span>") if s["has_live"] else ""
+        with cols[i % len(cols)]:
+            st.markdown(f"""
+                <div style="background:rgba(255,255,255,0.03);border:1px solid #222;border-left:4px solid {col};
+                            border-radius:10px;padding:14px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                        <span style="font-family:Orbitron;font-size:12px;color:#eee;font-weight:900;">{p['name']}</span>
+                        {badge}
+                    </div>
+                    <p style="font-family:JetBrains Mono;font-size:22px;color:{col};margin:8px 0 2px;font-weight:700;">{sign}${total:,.2f}</p>
+                    <span style="font-size:9px;color:#666;">P/L total · {s['open_count']} open · WR {s['win_rate']}%</span>
+                    {float_txt}
+                </div>
+            """, unsafe_allow_html=True)
+    st.divider()
+
+
 # ============================================================
 # LANDING PAGE
 # ============================================================
@@ -450,6 +467,9 @@ if st.session_state.app_view == "landing":
             <p style="color:#888;font-size:14px;letter-spacing:2px;margin-top:10px;">COMMAND CENTER</p>
         </div>
     """, unsafe_allow_html=True)
+
+    # ── AUTO TRADER P/L SUMMARY (admin) ───────────────────────
+    _render_autotrader_pl()
 
     # ── ACTIVE SIGNALS FROM BG SCANNER ────────────────────────
     bg_signals, bg_time = get_last_scan_results()
@@ -490,21 +510,22 @@ if st.session_state.app_view == "landing":
     _render_heatmap()
     st.markdown("""
         <p style="font-size:10px;color:#444;text-align:center;margin:10px 0 0;">
-            📌 Pilih pair di atas untuk lihat timeframe lain · Atau pilih kategori Forex / Commodities di bawah
+            📌 Pilih pair di atas untuk lihat timeframe lain · Atau pilih kategori Forex / Crypto di bawah
         </p>
     """, unsafe_allow_html=True)
     st.divider()
 
     # ── CATEGORY CARDS ────────────────────────────────────────
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
-            <div style="background:rgba(0,255,204,0.05);border:1px solid #00ffcc44;border-radius:12px;padding:20px;text-align:center;height:180px;">
+            <div style="background:rgba(0,255,204,0.05);border:1px solid #00ffcc44;border-radius:12px;padding:20px;text-align:center;height:200px;">
                 <h2 style="font-family:'Orbitron';color:#eee;font-size:18px;">⚛️ FOREX</h2>
-                <p style="color:#aaa;font-size:11px;">Majors & Minors</p>
-                <div style="font-size:10px;color:#666;margin:10px 0;">
+                <p style="color:#aaa;font-size:11px;">Majors, Minors & Metals/Energy</p>
+                <div style="font-size:10px;color:#666;margin:10px 0;line-height:1.6;">
                     EUR/USD • GBP/USD • USD/JPY • AUD/USD • USD/CAD • USD/CHF • NZD/USD <br>
-                    EUR/GBP • EUR/JPY • GBP/JPY • EUR/AUD • GBP/AUD
+                    EUR/GBP • EUR/JPY • GBP/JPY • EUR/AUD • GBP/AUD<br>
+                    🥇 Gold • Silver &nbsp; ⚡ Crude Oil (WTI)
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -515,28 +536,13 @@ if st.session_state.app_view == "landing":
 
     with col2:
         st.markdown("""
-            <div style="background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.3);border-radius:12px;padding:20px;text-align:center;height:180px;">
-                <h2 style="font-family:'Orbitron';color:#eee;font-size:18px;">🛢️ COMMODITIES</h2>
-                <p style="color:#aaa;font-size:11px;">Metals, Energy, Agriculture</p>
-                <div style="font-size:10px;color:#666;margin:10px 0;line-height:1.6;">
-                    Gold • Silver • Copper<br>
-                    WTI • NatGas • Wheat • Coffee • Cocoa
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        if st.button("OPEN COMMODITIES", key="btn_commo", use_container_width=True):
-            st.session_state.active_category = "Commodities"
-            st.session_state.app_view = "scanner"
-            st.rerun()
-
-    with col3:
-        st.markdown("""
-            <div style="background:rgba(138,43,226,0.08);border:1px solid rgba(138,43,226,0.3);border-radius:12px;padding:20px;text-align:center;height:180px;">
+            <div style="background:rgba(138,43,226,0.08);border:1px solid rgba(138,43,226,0.3);border-radius:12px;padding:20px;text-align:center;height:200px;">
                 <h2 style="font-family:'Orbitron';color:#eee;font-size:18px;">🪙 CRYPTO</h2>
-                <p style="color:#aaa;font-size:11px;">Top 5 Coins</p>
+                <p style="color:#aaa;font-size:11px;">13 Coins</p>
                 <div style="font-size:10px;color:#666;margin:10px 0;line-height:1.6;">
-                    Bitcoin • Ethereum • Solana<br>
-                    Avalanche • Sui
+                    Bitcoin • Ethereum • Solana • Avalanche • Sui<br>
+                    Ripple • BNB • Cardano • Dogecoin<br>
+                    Chainlink • Polkadot • Litecoin • Tron
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -556,8 +562,8 @@ tf = "4h" if st.session_state.app_view == "scanner" else st.session_state.get("d
 
 if st.session_state.app_view == "scanner":
     cat = st.session_state.active_category
-    icon = "⚛️" if cat == "Forex" else "🛢️"
-    color = "#00ffcc" if cat == "Forex" else "#FFD700"
+    icon = "🪙" if cat == "Crypto" else "⚛️"
+    color = "#8a2be2" if cat == "Crypto" else "#00ffcc"
     st.markdown(f"""
         <div style="padding:20px 0 10px;">
             <p style="font-family:'Orbitron';font-size:20px;color:{color};letter-spacing:4px;margin:0;">{icon} {cat.upper()} SCANNER</p>
@@ -717,16 +723,6 @@ try:
                 f"⏰ TF: {tf.upper()} | Session: {m_note}"
             )
             send_telegram_alert(msg)
-            log_signal(
-                ticker=active_ticker,
-                pair_name=pair_name,
-                decision=ai_data['decision'],
-                confidence=ai_data.get('confidence', 0),
-                q_score=q_total,
-                pa_signal=ai_data.get('pa_signal', 'NONE'),
-                plan=plan,
-                price=last_close,
-            )
             st.session_state[notif_key] = True
 
     # ── MAIN TABS ────────────────────────────────────────────

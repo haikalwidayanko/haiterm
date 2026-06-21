@@ -5,26 +5,5 @@
         "market_access": "ALL",
         "can_access_journal": true,
         "telegram_chat_id": null
-    },
-    "haikalwidayanko": {
-        "password": "ce0d9600e384810c685ad86df6f801c1a223d63715dea2344c2e22e9081e126c",
-        "role": "admin",
-        "market_access": "ALL",
-        "can_access_journal": true,
-        "telegram_chat_id": ""
-    },
-    "hafizwidayanko": {
-        "password": "e3535271399c50243fd56d028cad0821b76e0c27715f9026ea7519a4070bc1b2",
-        "role": "contributor",
-        "market_access": "ALL",
-        "can_access_journal": false,
-        "telegram_chat_id": ""
-    },
-    "testuser": {
-        "password": "13d249f2cb4127b40cfa757866850278793f814ded3c587fe5889e889a7a9f6c",
-        "role": "contributor",
-        "market_access": "ALL",
-        "can_access_journal": true,
-        "telegram_chat_id": ""
     }
 }

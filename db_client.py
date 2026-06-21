@@ -28,9 +28,12 @@ class SupabaseTable:
         self.table_name = table_name
         self.endpoint = f"{self.client.url}/rest/v1/{table_name}"
         self.params = {}
+        self._operation = None  # "select", "insert", "update", "delete"
+        self._payload = None
 
     def select(self, columns="*"):
         self.params["select"] = columns
+        self._operation = "select"
         return self
 
     def order(self, column, desc=False):
@@ -41,31 +44,55 @@ class SupabaseTable:
         self.params[column] = f"eq.{value}"
         return self
 
+    def insert(self, data):
+        self._operation = "insert"
+        self._payload = data
+        return self
+
+    def update(self, data):
+        self._operation = "update"
+        self._payload = data
+        return self
+
+    def delete(self):
+        self._operation = "delete"
+        return self
+
     def execute(self):
-        res = requests.get(self.endpoint, headers=self.client.headers, params=self.params)
-        res.raise_for_status()
         class Result:
             def __init__(self, data):
                 self.data = data
-        return Result(res.json())
 
-    def insert(self, data):
-        res = requests.post(self.endpoint, headers=self.client.headers, json=data)
-        res.raise_for_status()
-        return res.json()
+        op = self._operation or "select"
 
-    def update(self, data):
-        headers = self.client.headers.copy()
-        # Must have a filter applied before calling update, usually eq()
-        res = requests.patch(self.endpoint, headers=headers, params=self.params, json=data)
-        res.raise_for_status()
-        return res.json()
+        if op == "insert":
+            res = requests.post(self.endpoint, headers=self.client.headers, json=self._payload)
+            res.raise_for_status()
+            data = res.json() if res.content else []
+            return Result(data if isinstance(data, list) else [data])
 
-    def delete(self):
-        res = requests.delete(self.endpoint, headers=self.client.headers, params=self.params)
-        res.raise_for_status()
-        # Delete often returns 204 No Content
-        return True
+        elif op == "update":
+            # Supabase requires at least one filter for PATCH to avoid full-table update
+            filter_params = {k: v for k, v in self.params.items() if k != "select"}
+            if not filter_params:
+                raise ValueError("[db_client] update() called without any eq() filter — refused to prevent full-table update")
+            res = requests.patch(self.endpoint, headers=self.client.headers, params=filter_params, json=self._payload)
+            res.raise_for_status()
+            data = res.json() if res.content else []
+            return Result(data if isinstance(data, list) else [data])
+
+        elif op == "delete":
+            filter_params = {k: v for k, v in self.params.items() if k != "select"}
+            if not filter_params:
+                raise ValueError("[db_client] delete() called without any eq() filter — refused to prevent full-table delete")
+            res = requests.delete(self.endpoint, headers=self.client.headers, params=filter_params)
+            res.raise_for_status()
+            return Result([])
+
+        else:  # select
+            res = requests.get(self.endpoint, headers=self.client.headers, params=self.params)
+            res.raise_for_status()
+            return Result(res.json())
 
 @st.cache_resource
 def get_supabase_client():
